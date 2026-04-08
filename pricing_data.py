@@ -377,13 +377,8 @@ SERVERLESS_DBU_MULTIPLIER = {
 # --- Lakebase (Operational Database) ---
 # Source: https://www.databricks.com/product/pricing/lakebase
 # Compute: Database Serverless SKU with 0.213X DBU multiplier for autoscaling
-# Storage: Databricks Storage SKU with DSU multipliers
+# Storage: Uses STORAGE_DSU_MULTIPLIER lakebase_* keys above (15.0, 8.7, 3.91)
 LAKEBASE_COMPUTE_DBU_MULTIPLIER = 0.213  # autoscaling compute
-LAKEBASE_STORAGE_DSU_MULTIPLIER = {
-    "database_storage": 15.0,
-    "point_in_time_restore": 8.7,
-    "snapshots": 3.91,
-}
 
 
 # --- Lakeflow Connect ---
@@ -779,7 +774,7 @@ def get_price_per_dbu_for_region(cloud: str, region_id: str) -> float:
 def get_all_models_with_pt() -> list[str]:
     """Return model names that have both pay-per-token and provisioned throughput pricing (for break-even calculator)."""
     return [m for m, r in FOUNDATION_MODEL_DBU_PER_MILLION.items()
-            if r.get("input") and r.get("provisioned_per_hour")]
+            if r.get("input") and r.get("provisioned_per_hour") and "deprecated" not in m.lower()]
 
 
 # Quality tier hints for model comparison narrative

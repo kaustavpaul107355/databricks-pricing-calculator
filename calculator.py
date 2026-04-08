@@ -15,13 +15,13 @@ import datetime
 from pricing_data import (
     REGIONS_BY_CLOUD,
     get_price_per_dbu_for_region,
+    get_price_per_dbu_for_workload,
     get_proprietary_model_rates,
     SQL_SERVERLESS_DBU_PER_HOUR,
     VECTOR_SEARCH_DBU_PER_HOUR,
     MODEL_SERVING_CPU_DBU_PER_HOUR,
     MODEL_SERVING_GPU_DBU_PER_HOUR,
     MODEL_TRAINING_DBU_ESTIMATES,
-    EXAMPLE_PRICE_PER_DBU_BY_WORKLOAD,
     STORAGE_DSU_MULTIPLIER,
     FOUNDATION_MODEL_DBU_PER_MILLION,
     PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION,
@@ -51,9 +51,12 @@ def get_price_per_dbu(
     region: str = "us-east-1",
     workload_key: Optional[str] = None,
 ) -> float:
-    """Get $/DBU for a cloud and region, optionally for a specific workload (overrides region default)."""
-    if workload_key and workload_key in EXAMPLE_PRICE_PER_DBU_BY_WORKLOAD:
-        return EXAMPLE_PRICE_PER_DBU_BY_WORKLOAD[workload_key]
+    """Get $/DBU for a cloud and region, optionally for a specific workload.
+    Uses cloud-aware workload rates when available, falls back to region default."""
+    if workload_key:
+        rate = get_price_per_dbu_for_workload(workload_key, cloud)
+        if rate is not None:
+            return rate
     return get_price_per_dbu_for_region(cloud, region)
 
 

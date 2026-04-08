@@ -106,7 +106,7 @@ def inference_model_names() -> list[str]:
     """Return model names that support input+output tokens (not embedding-only)."""
     models = []
     for m, r in FOUNDATION_MODEL_DBU_PER_MILLION.items():
-        if r.get("input") and r.get("output"):
+        if r.get("input") and r.get("output") and "deprecated" not in m.lower():
             models.append(m)
     models.extend(PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION.keys())
     return models
@@ -115,7 +115,7 @@ def inference_model_names() -> list[str]:
 def embedding_model_names() -> list[str]:
     """Return model names that are embedding models (input only, no output)."""
     return [m for m, r in FOUNDATION_MODEL_DBU_PER_MILLION.items()
-            if r.get("input") and not r.get("output")]
+            if r.get("input") and not r.get("output") and "deprecated" not in m.lower()]
 
 
 # ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ def estimate_multi_agent_scenario(
     # Guardrails
     if include_guardrails:
         total_calls = orch_calls + worker_calls
-        avg_tokens = (avg_orchestrator_input_tokens + avg_worker_input_tokens) / 2
+        avg_tokens = (avg_orchestrator_input_tokens + avg_orchestrator_output_tokens + avg_worker_input_tokens + avg_worker_output_tokens) / 2
         payload_gb = total_calls * avg_tokens * 4 / (1024**3)
         if payload_gb > 0:
             r = estimate_gateway_payload(payload_gb, cloud=cloud, region=region)

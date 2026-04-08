@@ -282,7 +282,7 @@ def render_genai_calculator(cloud, region):
     # 3. Foundation Model (open)
     with st.expander("**Foundation Model Serving** — open models", expanded=True):
         st.caption("[Foundation Model Serving](https://www.databricks.com/product/pricing/foundation-model-serving)")
-        models_open = [m for m, r in FOUNDATION_MODEL_DBU_PER_MILLION.items() if r.get("input") or r.get("provisioned_per_hour")]
+        models_open = [m for m, r in FOUNDATION_MODEL_DBU_PER_MILLION.items() if (r.get("input") or r.get("provisioned_per_hour")) and "deprecated" not in m.lower()]
         fm_model = st.selectbox("Model", options=["— None —"] + models_open, key="fm_model")
         if fm_model != "— None —":
             c1, c2, c3 = st.columns(3)
@@ -334,17 +334,24 @@ def render_genai_calculator(cloud, region):
                 st.caption(f"→ **${r.cost_usd:,.2f}/month**")
 
     # 5. AI Parse
-    with st.expander("**AI Parse Document** — turn PDFs into structured data", expanded=True):
-        st.caption("[AI Parse Document](https://www.databricks.com/product/pricing/ai-parse) · *50% promo through June 30, 2026*")
+    import datetime as _dt
+    _promo_active = _dt.date.today() <= _dt.date.fromisoformat("2026-06-30")
+    _promo_label = " · *50% promo through June 30, 2026*" if _promo_active else ""
+    with st.expander(f"**AI Parse Document** — turn PDFs into structured data", expanded=True):
+        st.caption(f"[AI Parse Document](https://www.databricks.com/product/pricing/ai-parse){_promo_label}")
         parse_options = ["— None —"] + [label for label, _ in AI_PARSE_DOCUMENT_TYPE_LABELS]
         parse_complex_display = st.selectbox("What are you parsing?", options=parse_options, key="parse_doc_type")
         if parse_complex_display and parse_complex_display != "— None —":
             complexity_key = next(k for lbl, k in AI_PARSE_DOCUMENT_TYPE_LABELS if lbl == parse_complex_display)
-            pc1, pc2 = st.columns([2, 1])
-            with pc1:
+            if _promo_active:
+                pc1, pc2 = st.columns([2, 1])
+                with pc1:
+                    pages_1k = st.number_input("Pages (thousands)", min_value=0.0, value=0.0, step=0.5, key="parse_pages")
+                with pc2:
+                    apply_promo = st.checkbox("Apply 50% promo", value=True, key="parse_promo")
+            else:
                 pages_1k = st.number_input("Pages (thousands)", min_value=0.0, value=0.0, step=0.5, key="parse_pages")
-            with pc2:
-                apply_promo = st.checkbox("Apply 50% promo", value=True, key="parse_promo")
+                apply_promo = False
             if pages_1k > 0:
                 r = estimate_ai_parse(pages_1k, complexity_key, cloud=cloud, region=region, apply_promo=apply_promo)
                 line_items.append(("AI Parse Document", r.cost_usd, False))

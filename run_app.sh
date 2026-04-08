@@ -2,4 +2,4 @@
 # Run the Streamlit app (use this if the app fails when started from IDE/background)
 cd "$(dirname "$0")"
 export STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-exec streamlit run app.py --server.headless true
+exec streamlit run app.py --server.port 8000 --server.headless true
