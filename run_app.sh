@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Run the Streamlit app (use this if the app fails when started from IDE/background)
+# Run the Dash app locally
 cd "$(dirname "$0")"
-export STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-exec streamlit run app.py --server.port 8000 --server.headless true
+exec python app.py
