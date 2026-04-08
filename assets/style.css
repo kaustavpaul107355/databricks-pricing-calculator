@@ -1,0 +1,261 @@
+/* ===================================================================
+   Databricks GenAI TCO Estimator — Modern Frosted-Glass Theme
+   =================================================================== */
+
+/* --- CSS Variables ------------------------------------------------- */
+:root {
+  --db-red: #FF3621;
+  --db-orange: #FF6B35;
+  --db-teal: #00A972;
+  --db-dark: #1B3A4B;
+  --db-purple: #7570B3;
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.35);
+  --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+  --glass-blur: 12px;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- Global background --------------------------------------------- */
+body {
+  background: linear-gradient(135deg, #e8edf5 0%, #f0e6ef 40%, #e3ecf7 70%, #f5f0e8 100%) !important;
+  background-attachment: fixed !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* --- Navbar -------------------------------------------------------- */
+.navbar {
+  background: linear-gradient(135deg, var(--db-red) 0%, #e02e1a 50%, #c4260f 100%) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: 0 4px 24px rgba(255, 54, 33, 0.25);
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.navbar-brand {
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+}
+
+/* --- Glass card (generic) ------------------------------------------ */
+.glass-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--glass-shadow);
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+.glass-card:hover {
+  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.18);
+  transform: translateY(-1px);
+}
+
+/* --- Cloud/region bar ---------------------------------------------- */
+.cloud-region-bar {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border) !important;
+  border-left: 4px solid var(--db-red) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* --- Tabs ---------------------------------------------------------- */
+.nav-tabs {
+  border-bottom: 2px solid rgba(0, 0, 0, 0.06) !important;
+  gap: 4px;
+}
+.nav-tabs .nav-link {
+  border: none !important;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
+  padding: 10px 20px;
+  color: var(--db-dark);
+  font-weight: 500;
+  background: transparent;
+  transition: all var(--transition);
+  position: relative;
+}
+.nav-tabs .nav-link:hover {
+  background: rgba(255, 54, 33, 0.06);
+  color: var(--db-red);
+}
+.nav-tabs .nav-link.active {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(8px);
+  color: var(--db-red) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 -2px 0 var(--db-red) inset;
+}
+
+/* --- Accordion ----------------------------------------------------- */
+.accordion {
+  --bs-accordion-bg: transparent;
+  --bs-accordion-border-color: transparent;
+}
+.accordion-item {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-sm) !important;
+  margin-bottom: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  transition: box-shadow var(--transition);
+}
+.accordion-item:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+.accordion-button {
+  background: transparent !important;
+  font-weight: 600;
+  color: var(--db-dark) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 14px 18px;
+  box-shadow: none !important;
+}
+.accordion-button:not(.collapsed) {
+  color: var(--db-red) !important;
+  background: rgba(255, 54, 33, 0.04) !important;
+}
+.accordion-button::after {
+  filter: hue-rotate(0deg) brightness(0.6);
+}
+.accordion-body {
+  padding: 12px 18px 18px;
+}
+
+/* --- Form controls ------------------------------------------------- */
+.form-control, .form-select {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  transition: all var(--transition);
+  font-size: 0.9rem;
+}
+.form-control:focus, .form-select:focus {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: var(--db-red) !important;
+  box-shadow: 0 0 0 3px rgba(255, 54, 33, 0.12) !important;
+}
+
+/* --- Cost badge ---------------------------------------------------- */
+.alert-success {
+  background: linear-gradient(135deg, rgba(0, 169, 114, 0.12) 0%, rgba(0, 169, 114, 0.06) 100%) !important;
+  border: 1px solid rgba(0, 169, 114, 0.25) !important;
+  color: #006644 !important;
+  border-radius: 8px !important;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+}
+.alert-light {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 8px !important;
+  color: #666 !important;
+  backdrop-filter: blur(6px);
+}
+.alert-info {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.08) 0%, rgba(13, 110, 253, 0.03) 100%) !important;
+  border: 1px solid rgba(13, 110, 253, 0.2) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(6px);
+}
+
+/* --- Sidebar ------------------------------------------------------- */
+.sidebar-glass {
+  background: linear-gradient(135deg, rgba(27, 58, 75, 0.88) 0%, rgba(27, 58, 75, 0.95) 100%) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  color: #e0e8ef;
+}
+.sidebar-glass a {
+  color: rgba(255, 255, 255, 0.75) !important;
+  transition: color var(--transition), padding-left var(--transition);
+}
+.sidebar-glass a:hover {
+  color: #fff !important;
+  padding-left: 4px;
+}
+
+/* --- Summary card -------------------------------------------------- */
+.summary-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border) !important;
+  border-left: 4px solid var(--db-teal) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 4px 20px rgba(0, 169, 114, 0.08);
+}
+
+/* --- Charts -------------------------------------------------------- */
+.js-plotly-plot .plotly .main-svg {
+  border-radius: var(--radius-sm);
+}
+
+/* --- Radio / check items ------------------------------------------- */
+.form-check-input:checked {
+  background-color: var(--db-red) !important;
+  border-color: var(--db-red) !important;
+}
+.form-check-input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 54, 33, 0.15) !important;
+}
+
+/* --- Dropdown (dcc.Dropdown) --------------------------------------- */
+.Select-control {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+}
+.Select-control:hover {
+  border-color: var(--db-red) !important;
+}
+.Select-menu-outer {
+  border-radius: 0 0 8px 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* --- Scrollbar ------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* --- Section headings in tabs -------------------------------------- */
+.tab-content h4 {
+  color: var(--db-dark);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* --- Small label styling ------------------------------------------- */
+label.small.fw-semibold {
+  color: #495057;
+  letter-spacing: 0.01em;
+}
+
+/* --- Responsive polish --------------------------------------------- */
+@media (max-width: 768px) {
+  .navbar-brand { font-size: 1rem !important; }
+  .glass-card { border-radius: var(--radius-sm) !important; }
+}

@@ -91,11 +91,12 @@ server = app.server
 # ---------------------------------------------------------------------------
 def cost_badge(cost, label="monthly"):
     """Return a styled cost display."""
-    return dbc.Alert(
-        f"${cost:,.2f} / {label}" if cost > 0 else "No cost — adjust inputs above",
-        color="success" if cost > 0 else "light",
-        className="py-2 mb-0 mt-2",
-    )
+    if cost > 0:
+        return dbc.Alert([
+            html.Span(f"${cost:,.2f}", className="fw-bold fs-6"),
+            html.Span(f" / {label}", className="text-muted small"),
+        ], color="success", className="py-2 mb-0 mt-2")
+    return dbc.Alert("No cost — adjust inputs above", color="light", className="py-2 mb-0 mt-2")
 
 def none_opt(options):
     """Prepend a '— None —' option to a list."""
@@ -122,7 +123,7 @@ cloud_region_bar = dbc.Card(dbc.CardBody(dbc.Row([
         dbc.Label("Region", className="fw-bold small"),
         dbc.Select(id="region", options=region_options("AWS"), value="us-east-1"),
     ], md=5),
-], className="g-3")), className="mb-3 border-start border-4 border-danger")
+], className="g-3")), className="mb-3 cloud-region-bar")
 
 # ---------------------------------------------------------------------------
 # Layout: GenAI Calculator tab
@@ -305,7 +306,7 @@ genai_tab = html.Div([
         html.Div(id="genai-total"),
         html.Div(id="genai-training-total"),
         html.Div(id="genai-line-items"),
-    ]), className="border-start border-4 border-success"),
+    ]), className="summary-card"),
 ])
 
 # ---------------------------------------------------------------------------
@@ -452,7 +453,7 @@ sidebar_links = [html.Li(html.A(label, href=get_pricing_page_url(path), target="
 sidebar = dbc.Card(dbc.CardBody([
     html.H6("Pricing Sources", className="fw-bold mb-2"),
     html.Ul(sidebar_links, className="list-unstyled small"),
-]), className="bg-dark text-light")
+]), className="sidebar-glass")
 
 # ---------------------------------------------------------------------------
 # Main layout
@@ -470,24 +471,26 @@ app.layout = html.Div([
             # Main content
             dbc.Col([
                 cloud_region_bar,
-                dbc.Tabs([
-                    dbc.Tab(genai_tab, label="GenAI Calculator", tab_id="tab-genai",
-                            active_label_class_name="fw-bold", className="pt-3"),
-                    dbc.Tab(breakeven_tab, label="PT vs PPT Break-Even", tab_id="tab-be",
-                            active_label_class_name="fw-bold", className="pt-3"),
-                    dbc.Tab(comparison_tab, label="Model Comparison", tab_id="tab-mc",
-                            active_label_class_name="fw-bold", className="pt-3"),
-                    dbc.Tab(scenarios_tab, label="Scenario Templates", tab_id="tab-scn",
-                            active_label_class_name="fw-bold", className="pt-3"),
-                    dbc.Tab(quick_tab, label="Quick Estimate", tab_id="tab-qe",
-                            active_label_class_name="fw-bold", className="pt-3"),
-                ], active_tab="tab-genai"),
+                dbc.Card(dbc.CardBody([
+                    dbc.Tabs([
+                        dbc.Tab(genai_tab, label="GenAI Calculator", tab_id="tab-genai",
+                                active_label_class_name="fw-bold", className="pt-3"),
+                        dbc.Tab(breakeven_tab, label="PT vs PPT Break-Even", tab_id="tab-be",
+                                active_label_class_name="fw-bold", className="pt-3"),
+                        dbc.Tab(comparison_tab, label="Model Comparison", tab_id="tab-mc",
+                                active_label_class_name="fw-bold", className="pt-3"),
+                        dbc.Tab(scenarios_tab, label="Scenario Templates", tab_id="tab-scn",
+                                active_label_class_name="fw-bold", className="pt-3"),
+                        dbc.Tab(quick_tab, label="Quick Estimate", tab_id="tab-qe",
+                                active_label_class_name="fw-bold", className="pt-3"),
+                    ], active_tab="tab-genai"),
+                ]), className="glass-card"),
             ], md=9),
             # Sidebar
             dbc.Col(sidebar, md=3),
         ]),
-    ], fluid=True),
-], style={"backgroundColor": DB_LIGHT, "minHeight": "100vh"})
+    ], fluid=True, className="pb-4"),
+], style={"minHeight": "100vh"})
 
 # ===================================================================
 # CALLBACKS
