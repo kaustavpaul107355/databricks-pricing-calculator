@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Databricks Pricing Calculator</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 1rem; background: #f5f5f5; }
+    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    h1 { margin: 0 0 0.25rem 0; font-size: 1.5rem; }
+    .caption { color: #666; font-size: 0.875rem; margin-bottom: 1rem; }
+    .sidebar { margin-bottom: 1rem; padding: 0.75rem; background: #f9f9f9; border-radius: 6px; }
+    .sidebar label { margin-right: 0.5rem; font-weight: 500; }
+    .sidebar select { padding: 0.35rem 0.5rem; margin-right: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid #ddd; }
+    .tabs button { padding: 0.5rem 0.75rem; border: none; background: none; cursor: pointer; border-radius: 4px; }
+    .tabs button:hover { background: #eee; }
+    .tabs button.active { background: #e3f2fd; font-weight: 600; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .panel h2 { font-size: 1.1rem; margin-top: 0; }
+    .form-group { margin-bottom: 0.75rem; }
+    .form-group label { display: inline-block; min-width: 140px; }
+    .form-group input, .form-group select { padding: 0.35rem; border: 1px solid #ccc; border-radius: 4px; }
+    button.estimate { padding: 0.5rem 1rem; background: #0066cc; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
+    button.estimate:hover { background: #0052a3; }
+    .result { margin-top: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 6px; font-size: 1.1rem; }
+    .result strong { color: #2e7d32; }
+    .sources { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.8rem; color: #666; }
+    .sources a { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">
+      <strong>Legacy version.</strong> This standalone calculator has limited models and features.
+      For the full GenAI TCO Estimator with 30 models, scenario templates, break-even analysis, and model comparison,
+      run <code>streamlit run app.py</code> instead.
+    </div>
+    <h1>Databricks Pricing Calculator</h1>
+    <p class="caption">Estimate only. Actual prices vary by plan, region, and over time. Use the <a href="https://www.databricks.com/product/pricing/product-pricing/instance-types" target="_blank" rel="noopener">official calculator</a> or <code>system.billing.list_prices</code> for current SKU pricing.</p>
+
+    <div class="sidebar">
+      <label>Cloud</label>
+      <select id="cloud">
+        <option value="AWS">AWS</option>
+        <option value="Azure">Azure</option>
+        <option value="GCP">GCP</option>
+      </select>
+      <label>Region</label>
+      <select id="region"></select>
+      <span id="regionCaption"></span>
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="active" data-tab="sql">SQL Warehouse</button>
+      <button type="button" data-tab="vector">Vector Search</button>
+      <button type="button" data-tab="compute">Compute</button>
+      <button type="button" data-tab="training">Model Training</button>
+      <button type="button" data-tab="gpu">GPU Serving</button>
+      <button type="button" data-tab="storage">Storage</button>
+    </div>
+
+    <div id="panel-sql" class="panel active">
+      <h2>SQL Serverless Warehouse</h2>
+      <div class="form-group">
+        <label>Warehouse size</label>
+        <select id="sqlSize"></select>
+      </div>
+      <div class="form-group">
+        <label>Hours per month</label>
+        <input type="number" id="sqlHours" value="720" min="1" max="744">
+      </div>
+      <button type="button" class="estimate" id="btnSql">Estimate</button>
+      <div id="resultSql" class="result" style="display:none;"></div>
+    </div>
+
+    <div id="panel-vector" class="panel">
+      <h2>Vector Search</h2>
+      <div class="form-group">
+        <label>Tier</label>
+        <select id="vectorTier"></select>
+      </div>
+      <div class="form-group">
+        <label>Units</label>
+        <input type="number" id="vectorUnits" value="1" min="1">
+      </div>
+      <div class="form-group">
+        <label>Hours per month</label>
+        <input type="number" id="vectorHours" value="720" min="1" max="744">
+      </div>
+      <button type="button" class="estimate" id="btnVector">Estimate</button>
+      <div id="resultVector" class="result" style="display:none;"></div>
+    </div>
+
+    <div id="panel-compute" class="panel">
+      <h2>Compute (DBU-hours)</h2>
+      <div class="form-group">
+        <label>Workload type</label>
+        <select id="computeWorkload"></select>
+      </div>
+      <div class="form-group">
+        <label>DBU-hours</label>
+        <input type="number" id="computeDbuHours" value="1000" min="0" step="100">
+      </div>
+      <button type="button" class="estimate" id="btnCompute">Estimate</button>
+      <div id="resultCompute" class="result" style="display:none;"></div>
+    </div>
+
+    <div id="panel-training" class="panel">
+      <h2>Model Training (one-time)</h2>
+      <div class="form-group">
+        <label>Model</label>
+        <select id="trainingModel"></select>
+      </div>
+      <div class="form-group">
+        <label>Scale</label>
+        <select id="trainingScale"></select>
+      </div>
+      <button type="button" class="estimate" id="btnTraining">Estimate</button>
+      <div id="resultTraining" class="result" style="display:none;"></div>
+    </div>
+
+    <div id="panel-gpu" class="panel">
+      <h2>GPU Model Serving</h2>
+      <div class="form-group">
+        <label>Instance size</label>
+        <select id="gpuSize">
+          <option value="Small">Small</option>
+          <option value="Medium">Medium</option>
+          <option value="Medium 4X">Medium 4X</option>
+          <option value="Medium 8x">Medium 8x</option>
+          <option value="XLarge">XLarge</option>
+          <option value="2XLarge">2XLarge</option>
+          <option value="4XLarge">4XLarge</option>
+          <option value="Large 8X 40GB">Large 8X 40GB</option>
+          <option value="Large 8X 80GB">Large 8X 80GB</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Hours per month</label>
+        <input type="number" id="gpuHours" value="720" min="1" max="744">
+      </div>
+      <button type="button" class="estimate" id="btnGpu">Estimate</button>
+      <div id="resultGpu" class="result" style="display:none;"></div>
+    </div>
+
+    <div id="panel-storage" class="panel">
+      <h2>Databricks Storage (DSU)</h2>
+      <p style="font-size:0.85em;color:#888;">Note: Storage pricing uses a fixed $/DSU model and does not vary by cloud or region.</p>
+      <div class="form-group">
+        <label>GB stored</label>
+        <input type="number" id="storageGb" value="100" min="0" step="10">
+      </div>
+      <div class="form-group">
+        <label>$/DSU (illustrative)</label>
+        <input type="number" id="storagePriceDsu" value="0.07" min="0.01" step="0.01">
+      </div>
+      <button type="button" class="estimate" id="btnStorage">Estimate</button>
+      <div id="resultStorage" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="sources">
+      Based on the official <a href="https://www.databricks.com/product/pricing" target="_blank" rel="noopener">Databricks Pricing</a> pages (29 pages; see README).
+      Sources: <a href="https://www.databricks.com/product/pricing" target="_blank" rel="noopener">Pricing</a>,
+      <a href="https://www.databricks.com/product/sku-groups" target="_blank" rel="noopener">SKU Groups</a>,
+      <a href="https://learn.microsoft.com/en-us/azure/databricks/resources/pricing" target="_blank" rel="noopener">Azure Serverless DBU</a>
+    </div>
+  </div>
+
+  <script>
+    const DATA = {"regions": {"AWS": {"us-east-1": ["US East (N. Virginia)", 0.07], "us-east-2": ["US East (Ohio)", 0.07], "us-west-1": ["US West (N. California)", 0.075], "us-west-2": ["US West (Oregon)", 0.07], "eu-west-1": ["EU (Ireland)", 0.077], "eu-west-2": ["EU (London)", 0.079], "eu-central-1": ["EU (Frankfurt)", 0.077], "ap-northeast-1": ["Asia Pacific (Tokyo)", 0.085], "ap-northeast-2": ["Asia Pacific (Seoul)", 0.085], "ap-southeast-1": ["Asia Pacific (Singapore)", 0.088], "ap-southeast-2": ["Asia Pacific (Sydney)", 0.088], "ap-south-1": ["Asia Pacific (Mumbai)", 0.085]}, "Azure": {"eastus": ["East US", 0.07], "eastus2": ["East US 2", 0.07], "westus": ["West US", 0.075], "westus2": ["West US 2", 0.07], "westeurope": ["West Europe", 0.077], "northeurope": ["North Europe", 0.077], "uksouth": ["UK South", 0.079], "southeastasia": ["Southeast Asia", 0.088], "australiaeast": ["Australia East", 0.088], "japaneast": ["Japan East", 0.085], "centralindia": ["Central India", 0.085]}, "GCP": {"us-central1": ["us-central1 (Iowa)", 0.07], "us-east4": ["us-east4 (N. Virginia)", 0.07], "us-west1": ["us-west1 (Oregon)", 0.07], "europe-west1": ["europe-west1 (Belgium)", 0.077], "europe-west2": ["europe-west2 (London)", 0.079], "europe-west4": ["europe-west4 (Netherlands)", 0.077], "asia-northeast1": ["asia-northeast1 (Tokyo)", 0.085], "asia-southeast1": ["asia-southeast1 (Singapore)", 0.088], "australia-southeast1": ["australia-southeast1 (Sydney)", 0.088], "asia-south1": ["asia-south1 (Mumbai)", 0.085]}}, "sqlDbuPerHour": {"2X-Small": 4, "X-Small": 6, "Small": 12, "Medium": 24, "Large": 40, "X-Large": 80, "2X-Large": 144, "3X-Large": 272, "4X-Large": 528}, "vectorSearch": {"Standard": {"dbu_per_hour": 4.0, "vector_capacity_per_unit": 2000000}, "Storage Optimized": {"dbu_per_hour": 18.29, "vector_capacity_per_unit": 64000000}}, "gpuDbuPerHour": {"Small": 10.48, "Medium": 20, "Medium 4X": 112, "Medium 8x": 290.8, "XLarge": 78.6, "2XLarge": 157.2, "4XLarge": 314.4, "Large 8X 40GB": 538.4, "Large 8X 80GB": 628}, "modelTraining": {"Llama 3.3 70B": {"10M tokens": 225, "500M tokens": 11000}, "Llama 3.1 70B": {"10M tokens": 225, "500M tokens": 11000}, "Llama 3.1 8B": {"10M tokens": 100, "500M tokens": 4400}, "Llama 3.2 3B": {"10M tokens": 75, "500M tokens": 2750}, "Llama 3.2 1B": {"10M tokens": 25, "500M tokens": 1100}}, "pricePerDbuByWorkload": {"Jobs Light Compute": 0.12, "Jobs Compute": 0.15, "Jobs Compute (Photon)": 0.2, "All-Purpose Compute": 0.55, "All-Purpose Compute (Photon)": 0.65, "SQL Compute": 0.22, "SQL Pro Compute": 0.28, "Serverless SQL": 0.07, "DLT Core": 0.18, "DLT Pro": 0.22, "DLT Advanced": 0.28, "Model Training": 0.65, "Vector Search": 0.07, "Serverless Real-Time Inference": 0.07, "Database Serverless (Lakebase)": 0.07, "Clean Rooms Collaborator": 0.22, "Enhanced Security and Compliance": 0.1}, "storageMultiplier": {"vector_search": 10.0, "per_gb_stored": 1.0, "per_1000_writes": 0.3535, "per_1000_reads": 0.0226}};
+
+    const cloudSelect = document.getElementById('cloud');
+    const regionSelect = document.getElementById('region');
+    const regionCaption = document.getElementById('regionCaption');
+
+    function fillRegions() {
+      const cloud = cloudSelect.value;
+      const regs = DATA.regions[cloud] || DATA.regions.AWS;
+      regionSelect.innerHTML = '';
+      for (const [id, arr] of Object.entries(regs)) {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = id + ' — ' + arr[0];
+        regionSelect.appendChild(opt);
+      }
+      updateRegionCaption();
+    }
+    function updateRegionCaption() {
+      const cloud = cloudSelect.value;
+      const rid = regionSelect.value;
+      const regs = DATA.regions[cloud] || {};
+      const arr = regs[rid];
+      if (arr) regionCaption.textContent = '$' + arr[1].toFixed(3) + '/DBU';
+      else regionCaption.textContent = '';
+    }
+    function getPricePerDbu() {
+      const cloud = cloudSelect.value;
+      const rid = regionSelect.value;
+      const regs = DATA.regions[cloud] || DATA.regions.AWS;
+      return (regs[rid] && regs[rid][1]) || 0.07;
+    }
+
+    cloudSelect.addEventListener('change', fillRegions);
+    regionSelect.addEventListener('change', updateRegionCaption);
+
+    // Tabs
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Populate dropdowns
+    const sqlSizeSelect = document.getElementById('sqlSize');
+    Object.keys(DATA.sqlDbuPerHour).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s;
+      o.textContent = s;
+      sqlSizeSelect.appendChild(o);
+    });
+    Object.keys(DATA.vectorSearch).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s;
+      o.textContent = s;
+      document.getElementById('vectorTier').appendChild(o);
+    });
+    Object.keys(DATA.pricePerDbuByWorkload).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s;
+      o.textContent = s;
+      document.getElementById('computeWorkload').appendChild(o);
+    });
+    const trainingModel = document.getElementById('trainingModel');
+    Object.keys(DATA.modelTraining).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s;
+      o.textContent = s;
+      trainingModel.appendChild(o);
+    });
+    function fillTrainingScale() {
+      const sel = document.getElementById('trainingScale');
+      sel.innerHTML = '';
+      const model = trainingModel.value;
+      const scales = DATA.modelTraining[model] ? Object.keys(DATA.modelTraining[model]) : [];
+      scales.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s;
+        o.textContent = s;
+        sel.appendChild(o);
+      });
+    }
+    trainingModel.addEventListener('change', fillTrainingScale);
+    fillTrainingScale();
+
+    fillRegions();
+
+    function showResult(el, cost, detail) {
+      el.style.display = 'block';
+      el.innerHTML = '<strong>Estimated cost: $' + cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</strong>' + (detail ? '<br>' + detail : '');
+    }
+
+    document.getElementById('btnSql').addEventListener('click', () => {
+      const size = document.getElementById('sqlSize').value;
+      const hours = +document.getElementById('sqlHours').value;
+      const dbuPerHr = DATA.sqlDbuPerHour[size];
+      const price = getPricePerDbu();
+      const dbuTotal = dbuPerHr * hours;
+      const cost = dbuTotal * price;
+      showResult(document.getElementById('resultSql'), cost, dbuPerHr + ' DBU/hr × ' + hours + ' hrs = ' + Math.round(dbuTotal) + ' DBUs · $' + price.toFixed(4) + '/DBU');
+    });
+
+    document.getElementById('btnVector').addEventListener('click', () => {
+      const tier = document.getElementById('vectorTier').value;
+      const units = +document.getElementById('vectorUnits').value;
+      const hours = +document.getElementById('vectorHours').value;
+      const info = DATA.vectorSearch[tier];
+      const dbuPerHr = info.dbu_per_hour;
+      const price = getPricePerDbu();
+      const dbuTotal = dbuPerHr * units * hours;
+      const cost = dbuTotal * price;
+      showResult(document.getElementById('resultVector'), cost, dbuPerHr + ' DBU/hr/unit × ' + units + ' × ' + hours + ' hrs = ' + Math.round(dbuTotal) + ' DBUs');
+    });
+
+    document.getElementById('btnCompute').addEventListener('click', () => {
+      const workload = document.getElementById('computeWorkload').value;
+      const dbuHours = +document.getElementById('computeDbuHours').value;
+      const price = DATA.pricePerDbuByWorkload[workload] || getPricePerDbu();
+      const cost = dbuHours * price;
+      showResult(document.getElementById('resultCompute'), cost, '$' + price + '/DBU × ' + dbuHours.toLocaleString() + ' DBU-hours');
+    });
+
+    document.getElementById('btnTraining').addEventListener('click', () => {
+      const model = document.getElementById('trainingModel').value;
+      const scale = document.getElementById('trainingScale').value;
+      const dbu = DATA.modelTraining[model] && DATA.modelTraining[model][scale];
+      const price = DATA.pricePerDbuByWorkload['Model Training'] || 0.65;
+      const cost = dbu * price;
+      showResult(document.getElementById('resultTraining'), cost, '~' + dbu + ' DBUs at $' + price + '/DBU');
+    });
+
+    document.getElementById('btnGpu').addEventListener('click', () => {
+      const size = document.getElementById('gpuSize').value;
+      const hours = +document.getElementById('gpuHours').value;
+      const dbuPerHr = DATA.gpuDbuPerHour[size];
+      const price = getPricePerDbu();
+      const dbuTotal = dbuPerHr * hours;
+      const cost = dbuTotal * price;
+      showResult(document.getElementById('resultGpu'), cost, dbuPerHr + ' DBU/hr × ' + hours + ' hrs');
+    });
+
+    document.getElementById('btnStorage').addEventListener('click', () => {
+      const gb = +document.getElementById('storageGb').value;
+      const priceDsu = +document.getElementById('storagePriceDsu').value;
+      const m = DATA.storageMultiplier;
+      const dsu = gb * m.per_gb_stored;
+      const cost = dsu * priceDsu;
+      showResult(document.getElementById('resultStorage'), cost, gb + ' GB × ' + m.per_gb_stored + ' = ' + dsu.toFixed(2) + ' DSUs');
+    });
+  </script>
+</body>
+</html>
