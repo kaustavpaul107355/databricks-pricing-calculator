@@ -148,10 +148,11 @@ genai_tab = html.Div([
         # 1. Vector Search
         _section("Vector Search — embeddings & similarity search",
                  "https://www.databricks.com/product/pricing/vector-search", [
+            html.Small("Endpoint tier, number of endpoints, and expected running hours per month.", className="text-muted"),
             dbc.Row([
-                dbc.Col(dbc.Select(id="vs-tier", options=[{"label": k, "value": k} for k in VECTOR_SEARCH_DBU_PER_HOUR], value="Standard"), md=4),
-                dbc.Col(dbc.Input(id="vs-units", type="number", min=0, value=0, step=1, placeholder="Units"), md=4),
-                dbc.Col(dbc.Input(id="vs-hours", type="number", min=0, value=720, step=72, placeholder="Hours/mo"), md=4),
+                dbc.Col([dbc.Label("Tier", className="small fw-semibold mt-2"), dbc.Select(id="vs-tier", options=[{"label": k, "value": k} for k in VECTOR_SEARCH_DBU_PER_HOUR], value="Standard")], md=4),
+                dbc.Col([dbc.Label("Number of endpoints", className="small fw-semibold mt-2"), dbc.Input(id="vs-units", type="number", min=0, value=0, step=1, placeholder="e.g. 2")], md=4),
+                dbc.Col([dbc.Label("Hours / month", className="small fw-semibold mt-2"), dbc.Input(id="vs-hours", type="number", min=0, value=720, step=72, placeholder="720 = 24×30")], md=4),
             ], className="g-2"),
             html.Div(id="vs-result"),
         ], "vs"),
@@ -159,111 +160,135 @@ genai_tab = html.Div([
         # 2. Reranker
         _section("Vector Search Reranker (optional)",
                  "https://www.databricks.com/product/pricing/vector-search", [
-            dbc.Input(id="reranker-1k", type="number", min=0, value=0, step=1, placeholder="Requests (thousands)"),
+            html.Small("Re-ranks retrieved results for higher relevance. Enter expected monthly volume.", className="text-muted"),
+            dbc.Label("Reranker requests (thousands / month)", className="small fw-semibold mt-2"),
+            dbc.Input(id="reranker-1k", type="number", min=0, value=0, step=1, placeholder="e.g. 50"),
             html.Div(id="reranker-result"),
         ], "reranker"),
 
         # 3. Agent Bricks
         _section("Agent Bricks — build agents on your data",
                  "https://www.databricks.com/product/pricing/agent-bricks", [
+            html.Small("Select agent type. CPU is typical for text-based agents; GPU for vision/multimodal workloads.", className="text-muted"),
+            dbc.Label("What are you building?", className="small fw-semibold mt-2"),
             dbc.Select(id="ab-type", options=none_opt(["Knowledge Assistant", "Supervisor Agent"]), value="__none__"),
-            dbc.RadioItems(id="ab-mode", options=["CPU (typical)", "GPU"], value="CPU (typical)", inline=True, className="mt-2"),
+            dbc.Label("Compute mode", className="small fw-semibold mt-2"),
+            dbc.RadioItems(id="ab-mode", options=["CPU (typical)", "GPU"], value="CPU (typical)", inline=True),
             dbc.Row([
-                dbc.Col(dbc.Input(id="ab-cpu-req", type="number", min=0, value=0, step=72, placeholder="Request-hrs/mo"), md=6, id="ab-cpu-wrap"),
+                dbc.Col([dbc.Label("Request-hours / month", className="small fw-semibold mt-2"), dbc.Input(id="ab-cpu-req", type="number", min=0, value=0, step=72, placeholder="e.g. 720")], md=6, id="ab-cpu-wrap"),
                 dbc.Col([
+                    dbc.Label("GPU instance size", className="small fw-semibold mt-2"),
                     dbc.Select(id="ab-gpu-size", options=[{"label": s, "value": s} for s in _gpu_sizes], value="Small"),
-                    dbc.Input(id="ab-gpu-hrs", type="number", min=0, value=0, step=72, placeholder="Hours/mo", className="mt-1"),
+                    dbc.Label("GPU hours / month", className="small fw-semibold mt-1"),
+                    dbc.Input(id="ab-gpu-hrs", type="number", min=0, value=0, step=72, placeholder="e.g. 720"),
                 ], md=6, id="ab-gpu-wrap"),
-            ], className="g-2 mt-2"),
+            ], className="g-2"),
             html.Div(id="ab-result"),
         ], "ab"),
 
         # 4. AI Gateway
         _section("Mosaic AI Gateway — guardrails, logging, usage tracking",
                  "https://www.databricks.com/product/pricing/mosaic-ai-gateway", [
+            html.Small("Select features you plan to use. Guardrails cost is included in Model Serving; Inference Tables and Usage Tracking are billed on payload volume.", className="text-muted"),
+            dbc.Label("Features", className="small fw-semibold mt-2"),
             dbc.Checklist(id="gw-features", options=[
                 {"label": " AI Guardrails", "value": "guard"},
                 {"label": " Inference Tables", "value": "inf"},
                 {"label": " Usage Tracking", "value": "usage"},
             ], value=[], inline=True),
-            dbc.Input(id="gw-payload", type="number", min=0, value=0, step=0.5, placeholder="Payload GB/mo", className="mt-2"),
+            dbc.Label("Total payload volume (GB / month)", className="small fw-semibold mt-2"),
+            dbc.Input(id="gw-payload", type="number", min=0, value=0, step=0.5, placeholder="e.g. 10"),
             html.Div(id="gw-result"),
         ], "gw"),
 
         # 5. Model Serving
         _section("Model Serving — custom or third-party models",
                  "https://www.databricks.com/product/pricing/model-serving", [
+            html.Small("For serving your own custom models or external models. Choose CPU for lightweight models, GPU for large/multimodal models.", className="text-muted"),
+            dbc.Label("Compute mode", className="small fw-semibold mt-2"),
             dbc.RadioItems(id="serv-mode", options=["CPU", "GPU"], value="CPU", inline=True),
             dbc.Row([
-                dbc.Col(dbc.Input(id="serv-cpu-req", type="number", min=0, value=0, step=72, placeholder="Request-hrs/mo"), id="serv-cpu-wrap"),
+                dbc.Col([dbc.Label("Request-hours / month", className="small fw-semibold mt-2"), dbc.Input(id="serv-cpu-req", type="number", min=0, value=0, step=72, placeholder="e.g. 720")], id="serv-cpu-wrap"),
                 dbc.Col([
+                    dbc.Label("GPU instance size", className="small fw-semibold mt-2"),
                     dbc.Select(id="serv-gpu-size", options=[{"label": s, "value": s} for s in _gpu_sizes], value="Small"),
-                    dbc.Input(id="serv-gpu-hrs", type="number", min=0, value=0, step=72, placeholder="Hours/mo", className="mt-1"),
+                    dbc.Label("GPU hours / month", className="small fw-semibold mt-1"),
+                    dbc.Input(id="serv-gpu-hrs", type="number", min=0, value=0, step=72, placeholder="e.g. 720"),
                 ], id="serv-gpu-wrap"),
-            ], className="g-2 mt-2"),
+            ], className="g-2"),
             html.Div(id="serv-result"),
         ], "serv"),
 
         # 6. Foundation Model (open)
         _section("Foundation Model Serving — open models",
                  "https://www.databricks.com/product/pricing/foundation-model-serving", [
+            html.Small("Open-source models (Llama, DBRX, etc.) served by Databricks. Enter monthly token volume or Provisioned Throughput (PT) hours.", className="text-muted"),
+            dbc.Label("Model", className="small fw-semibold mt-2"),
             dbc.Select(id="fm-model", options=none_opt(_open_models), value="__none__"),
             dbc.Row([
-                dbc.Col(dbc.Input(id="fm-in", type="number", min=0, value=0, step=0.5, placeholder="Input M tokens"), md=4),
-                dbc.Col(dbc.Input(id="fm-out", type="number", min=0, value=0, step=0.5, placeholder="Output M tokens"), md=4),
-                dbc.Col(dbc.Input(id="fm-pt", type="number", min=0, value=0, step=24, placeholder="PT hours"), md=4),
-            ], className="g-2 mt-2"),
+                dbc.Col([dbc.Label("Input tokens (millions / month)", className="small fw-semibold mt-2"), dbc.Input(id="fm-in", type="number", min=0, value=0, step=0.5, placeholder="e.g. 10")], md=4),
+                dbc.Col([dbc.Label("Output tokens (millions / month)", className="small fw-semibold mt-2"), dbc.Input(id="fm-out", type="number", min=0, value=0, step=0.5, placeholder="e.g. 2")], md=4),
+                dbc.Col([dbc.Label("PT hours / month", className="small fw-semibold mt-2"), dbc.Input(id="fm-pt", type="number", min=0, value=0, step=24, placeholder="e.g. 720")], md=4),
+            ], className="g-2"),
             html.Div(id="fm-result"),
         ], "fm"),
 
         # 7. Proprietary Foundation Model
         _section("Proprietary Foundation Model — OpenAI, Anthropic, Google",
                  "https://www.databricks.com/product/pricing/proprietary-foundation-model-serving", [
+            html.Small("Third-party models (GPT-4o, Claude, Gemini) via Databricks. Cache & Batch fields are optional discounts.", className="text-muted"),
+            dbc.Label("Model", className="small fw-semibold mt-2"),
             dbc.Select(id="prop-model", options=none_opt(_prop_models), value="__none__"),
-            dbc.RadioItems(id="prop-tier", options=[], value=None, inline=True, className="mt-2"),
+            dbc.Label("Pricing tier", className="small fw-semibold mt-2"),
+            dbc.RadioItems(id="prop-tier", options=[], value=None, inline=True),
             dbc.Row([
-                dbc.Col(dbc.Input(id="prop-in", type="number", min=0, value=0, step=0.5, placeholder="Input M"), md=3),
-                dbc.Col(dbc.Input(id="prop-out", type="number", min=0, value=0, step=0.5, placeholder="Output M"), md=3),
-                dbc.Col(dbc.Input(id="prop-cw", type="number", min=0, value=0, step=0.5, placeholder="Cache write M"), md=2),
-                dbc.Col(dbc.Input(id="prop-cr", type="number", min=0, value=0, step=0.5, placeholder="Cache read M"), md=2),
-                dbc.Col(dbc.Input(id="prop-batch", type="number", min=0, value=0, step=1, placeholder="Batch hrs"), md=2),
-            ], className="g-2 mt-2"),
+                dbc.Col([dbc.Label("Input tokens (M / mo)", className="small fw-semibold mt-2"), dbc.Input(id="prop-in", type="number", min=0, value=0, step=0.5, placeholder="e.g. 10")], md=3),
+                dbc.Col([dbc.Label("Output tokens (M / mo)", className="small fw-semibold mt-2"), dbc.Input(id="prop-out", type="number", min=0, value=0, step=0.5, placeholder="e.g. 2")], md=3),
+                dbc.Col([dbc.Label("Cache write (M)", className="small fw-semibold mt-2"), dbc.Input(id="prop-cw", type="number", min=0, value=0, step=0.5, placeholder="0")], md=2),
+                dbc.Col([dbc.Label("Cache read (M)", className="small fw-semibold mt-2"), dbc.Input(id="prop-cr", type="number", min=0, value=0, step=0.5, placeholder="0")], md=2),
+                dbc.Col([dbc.Label("Batch hours", className="small fw-semibold mt-2"), dbc.Input(id="prop-batch", type="number", min=0, value=0, step=1, placeholder="0")], md=2),
+            ], className="g-2"),
             html.Div(id="prop-result"),
         ], "prop"),
 
         # 8. AI Parse
         _section("AI Parse Document — turn PDFs into structured data",
                  "https://www.databricks.com/product/pricing/ai-parse", [
-            html.Small("50% promo through June 30, 2026", className="text-success fw-bold") if PROMO_ACTIVE else None,
+            html.Small("Convert PDFs, images, and scanned documents into structured data. Pick complexity, then enter page volume.", className="text-muted"),
+            html.Small(" 50% promo through June 30, 2026", className="text-success fw-bold") if PROMO_ACTIVE else None,
+            dbc.Label("Document type / complexity", className="small fw-semibold mt-2"),
             dbc.Select(id="parse-type", options=none_opt([lbl for lbl, _ in AI_PARSE_DOCUMENT_TYPE_LABELS]),
-                       value="__none__", className="mt-1"),
+                       value="__none__"),
             dbc.Row([
-                dbc.Col(dbc.Input(id="parse-pages", type="number", min=0, value=0, step=0.5, placeholder="Pages (thousands)"), md=8),
+                dbc.Col([dbc.Label("Pages (thousands / month)", className="small fw-semibold mt-2"), dbc.Input(id="parse-pages", type="number", min=0, value=0, step=0.5, placeholder="e.g. 100")], md=8),
                 dbc.Col(dbc.Checklist(id="parse-promo", options=[{"label": " 50% promo", "value": "yes"}],
-                                      value=["yes"] if PROMO_ACTIVE else [], className="mt-2",
+                                      value=["yes"] if PROMO_ACTIVE else [], className="mt-4",
                                       style={"display": "block" if PROMO_ACTIVE else "none"}), md=4),
-            ], className="g-2 mt-2"),
+            ], className="g-2"),
             html.Div(id="parse-result"),
         ], "parse"),
 
         # 9. Agent Evaluation
         _section("Agent Evaluation — LLM Judge, Synthetic Data",
                  "https://www.databricks.com/product/pricing/agent-evaluation", [
+            html.Small("LLM-as-a-Judge evaluation and synthetic data generation for testing your agents.", className="text-muted"),
+            dbc.Label("Evaluation type", className="small fw-semibold mt-2"),
             dbc.Select(id="eval-type", options=none_opt(_eval_types), value="__none__"),
             dbc.Row([
-                dbc.Col(dbc.Input(id="eval-in", type="number", min=0, value=0, step=0.5, placeholder="Input M"), md=4),
-                dbc.Col(dbc.Input(id="eval-out", type="number", min=0, value=0, step=0.5, placeholder="Output M"), md=4),
-                dbc.Col(dbc.Input(id="eval-q", type="number", min=0, value=0, step=10, placeholder="Questions"), md=4),
-            ], className="g-2 mt-2"),
+                dbc.Col([dbc.Label("Input tokens (M / mo)", className="small fw-semibold mt-2"), dbc.Input(id="eval-in", type="number", min=0, value=0, step=0.5, placeholder="e.g. 1")], md=4),
+                dbc.Col([dbc.Label("Output tokens (M / mo)", className="small fw-semibold mt-2"), dbc.Input(id="eval-out", type="number", min=0, value=0, step=0.5, placeholder="e.g. 0.5")], md=4),
+                dbc.Col([dbc.Label("Questions per eval run", className="small fw-semibold mt-2"), dbc.Input(id="eval-q", type="number", min=0, value=0, step=10, placeholder="e.g. 100")], md=4),
+            ], className="g-2"),
             html.Div(id="eval-result"),
         ], "eval"),
 
         # 10. Model Training
         _section("Model Training — fine-tuning (one-time)",
                  "https://www.databricks.com/product/pricing/mosaic-foundation-model-training", [
+            html.Small("One-time fine-tuning cost. Select the base model and training scale (data size).", className="text-muted"),
             dbc.Row([
-                dbc.Col(dbc.Select(id="train-model", options=none_opt(_train_models), value="__none__"), md=6),
-                dbc.Col(dbc.Select(id="train-scale", options=[], value=None), md=6),
+                dbc.Col([dbc.Label("Base model", className="small fw-semibold mt-2"), dbc.Select(id="train-model", options=none_opt(_train_models), value="__none__")], md=6),
+                dbc.Col([dbc.Label("Training scale", className="small fw-semibold mt-2"), dbc.Select(id="train-scale", options=[], value=None)], md=6),
             ], className="g-2"),
             html.Div(id="train-result", className="mt-2"),
         ], "train"),
