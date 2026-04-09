@@ -521,8 +521,8 @@ def calc_vs(tier, units, hours, cloud, region):
     try:
         r = estimate_vector_search(tier, int(units), hours, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
-    except Exception:
-        return None, 0
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
 
 @callback(Output("reranker-result", "children"), Output("store-reranker", "data"),
           Input("reranker-1k", "value"), Input("cloud", "value"), Input("region", "value"))
@@ -599,8 +599,8 @@ def calc_fm(model, fm_in, fm_out, fm_pt, cloud, region):
     try:
         r = estimate_foundation_model_tokens(model, input_millions=fm_in, output_millions=fm_out, provisioned_hours=fm_pt, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
-    except Exception:
-        return None, 0
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
 
 # Proprietary FM: update tier options when model changes
 @callback(Output("prop-tier", "options"), Output("prop-tier", "value"),
@@ -629,8 +629,8 @@ def calc_prop(model, tier, p_in, p_out, cw, cr, batch, cloud, region):
                                                    tier=tier, cache_write_millions=cw, cache_read_millions=cr,
                                                    batch_hours=batch, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
-    except Exception:
-        return None, 0
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
 
 @callback(Output("parse-result", "children"), Output("store-parse", "data"),
           Input("parse-type", "value"), Input("parse-pages", "value"), Input("parse-promo", "value"),
@@ -660,8 +660,8 @@ def calc_eval(eval_type, e_in, e_out, e_q, cloud, region):
     try:
         r = estimate_agent_evaluation(eval_type, input_millions=e_in, output_millions=e_out, questions=e_q, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
-    except Exception:
-        return None, 0
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
 
 # Training: update scale options when model changes
 @callback(Output("train-scale", "options"), Output("train-scale", "value"),
@@ -682,8 +682,8 @@ def calc_train(model, scale, cloud, region):
     try:
         r = estimate_model_training(model, scale, cloud=cloud, region=region)
         return dbc.Alert(f"One-time training: ${r.cost_usd:,.2f}", color="info", className="py-2"), r.cost_usd
-    except Exception:
-        return None, 0
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
 
 # --- GenAI: total summary ---
 @callback(Output("genai-total", "children"), Output("genai-training-total", "children"),

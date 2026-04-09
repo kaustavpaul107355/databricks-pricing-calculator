@@ -6,5 +6,6 @@ venv/
 *.egg-info/
 dist/
 build/
-.streamlit/
 .DS_Store
+# Workspace-only files (not for git)
+app_keepalive.py

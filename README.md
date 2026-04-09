@@ -2,6 +2,8 @@
 
 Ballpark pricing and Total Cost of Ownership estimator for GenAI solutions on Databricks. Covers 30 models across 3 clouds and 69 regions, with scenario-based TCO modeling for RAG, multi-agent, batch AI, and fine-tuning workloads.
 
+Built with **Dash** (Plotly) and **dash-bootstrap-components**. Runs on port 8000.
+
 ## Features
 
 | Mode | What it does |
@@ -26,11 +28,23 @@ Ballpark pricing and Total Cost of Ownership estimator for GenAI solutions on Da
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the Streamlit app
-streamlit run app.py
+# Run the Dash app (serves on http://localhost:8000)
+python app.py
 ```
 
 Or: `./run_app.sh`
+
+## Databricks Apps deployment
+
+The app is configured for Databricks Apps via `app.yaml`:
+
+```yaml
+command:
+  - python
+  - app.py
+```
+
+The app binds to port 8000, which is the default expected by Databricks Apps.
 
 ## CLI
 
@@ -63,15 +77,18 @@ python cli.py list skus --cloud AWS
 
 ```
 databricks-pricing-calculator/
-├── app.py              # Streamlit TCO estimator (5 modes)
+├── app.py              # Dash UI (5 tabs, tile grid, frosted-glass theme)
 ├── app.yaml            # Databricks Apps deployment config
+├── assets/
+│   └── style.css       # Custom CSS (glass effects, tile grid, theme)
 ├── calculator.py       # Atomic estimation functions
 ├── scenarios.py        # Composite scenario estimators + break-even + comparison
 ├── presets.py          # T-shirt sizing presets (S/M/L)
 ├── pricing_data.py     # All reference data (models, rates, regions, SKUs)
 ├── cli.py              # Command-line interface
-├── index.html          # Legacy standalone calculator (limited, no server needed)
-├── requirements.txt    # Python dependencies
+├── index.html          # Standalone HTML calculator (deprecated — kept for offline/demo use)
+├── requirements.txt    # Python dependencies (dash, dash-bootstrap-components, plotly)
+├── run_app.sh          # Local run script
 ├── PRICING_SOURCES.md  # Data sources and verification status
 └── README.md           # This file
 ```
