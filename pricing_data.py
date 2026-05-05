@@ -184,20 +184,19 @@ MODEL_SERVING_GPU_DBU_PER_HOUR = {
 # Source: https://www.databricks.com/product/pricing/foundation-model-serving
 # DBU per 1M input tokens, per 1M output tokens; optional provisioned_per_hour (DBU/hr).
 FOUNDATION_MODEL_DBU_PER_MILLION = {
-    "Llama 4 Maverick": {"input": 7.143, "output": 21.429, "provisioned_per_hour": 85.714, "scaling_capacity_per_hour": None},
+    "Llama 4 Maverick": {"input": 7.143, "output": 21.429, "provisioned_per_hour": 85.714, "scaling_capacity_per_hour": 85.714},
     "Llama 3.3 70B": {"input": 7.143, "output": 21.429, "provisioned_per_hour": 85.714, "scaling_capacity_per_hour": 342.857},
     "Llama 3.1 405B (deprecated)": {"input": None, "output": None, "provisioned_per_hour": 150.0, "scaling_capacity_per_hour": None},  # PPT retired Feb 15 2026; PT retiring May 15 2026
     "Llama 3.1 8B": {"input": 2.143, "output": 6.429, "provisioned_per_hour": 53.571, "scaling_capacity_per_hour": 106.0},
     "Llama 3.2 3B": {"input": None, "output": None, "provisioned_per_hour": 46.429, "scaling_capacity_per_hour": 92.857},
     "Llama 3.2 1B": {"input": None, "output": None, "provisioned_per_hour": 42.857, "scaling_capacity_per_hour": 85.714},
-    "GPT OSS 120B": {"input": 2.143, "output": 8.571, "provisioned_per_hour": 71.429, "scaling_capacity_per_hour": None},
-    "Gemma 3 12B": {"input": 2.143, "output": 7.143, "provisioned_per_hour": 71.429, "scaling_capacity_per_hour": None},
-    "GPT OSS 20B": {"input": 1.0, "output": 4.286, "provisioned_per_hour": 53.571, "scaling_capacity_per_hour": None},
-    "GTE": {"input": 1.857, "output": None, "provisioned_per_hour": 20.0, "scaling_capacity_per_hour": None},
-    "BGE Large": {"input": 1.429, "output": None, "provisioned_per_hour": 24.0, "scaling_capacity_per_hour": None},
-    # --- New models (Public Preview, DBU rates not yet in Azure pricing table) ---
-    "Qwen3-Embedding-0.6B": {"input": 1.429, "output": None, "provisioned_per_hour": 20.0, "scaling_capacity_per_hour": None},  # Embedding model; rates estimated from similar-class models (BGE/GTE)
-    "Qwen3-Next 80B A3B": {"input": 7.143, "output": 21.429, "provisioned_per_hour": 85.714, "scaling_capacity_per_hour": None},  # Public Preview; rates estimated from similar-class models (Llama 70B)
+    "GPT OSS 120B": {"input": 2.143, "output": 8.571, "provisioned_per_hour": 71.429, "scaling_capacity_per_hour": 71.429},
+    "Gemma 3 12B": {"input": 2.143, "output": 7.143, "provisioned_per_hour": 71.429, "scaling_capacity_per_hour": 71.429},
+    "GPT OSS 20B": {"input": 1.0, "output": 4.286, "provisioned_per_hour": 53.571, "scaling_capacity_per_hour": 53.571},
+    "GTE": {"input": 1.857, "output": None, "provisioned_per_hour": 20.0, "scaling_capacity_per_hour": 20.0},
+    "BGE Large": {"input": 1.429, "output": None, "provisioned_per_hour": 24.0, "scaling_capacity_per_hour": 24.0},
+    "Qwen3-Embedding-0.6B": {"input": 0.286, "output": None, "provisioned_per_hour": 25.0, "scaling_capacity_per_hour": 25.0},  # Public Preview
+    "Qwen3-Next 80B A3B": {"input": 2.143, "output": 17.143, "provisioned_per_hour": 78.571, "scaling_capacity_per_hour": 78.571},  # Public Preview (us-west-2, ap-northeast-1 only)
 }
 
 # --- Proprietary Foundation Model Serving (OpenAI, Anthropic, Google) ---
@@ -208,9 +207,29 @@ FOUNDATION_MODEL_DBU_PER_MILLION = {
 # batch: DBU/hr for batch inference
 PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION = {
     # --- OpenAI ---
+    "GPT 5.4/5.5 Pro": {
+        "global": {"input": 428.571, "output": 2571.429, "cache_write": 428.571, "cache_read": 42.857, "batch": 1142.857},
+        "in_geo": {"input": 471.428, "output": 2828.572, "cache_write": 471.428, "cache_read": 47.143, "batch": 1257.143},
+        "long_context": {"input": 857.142, "output": 3857.144, "cache_write": 857.142, "cache_read": 85.714, "batch": 1142.857},
+        "in_geo_long_context": {"input": 942.856, "output": 4242.858, "cache_write": 942.856, "cache_read": 94.286, "batch": 1257.143},
+    },
+    "GPT 5.5": {
+        "global": {"input": 71.429, "output": 428.571, "cache_write": 71.429, "cache_read": 7.143, "batch": 214.286},
+        "in_geo": {"input": 78.572, "output": 471.428, "cache_write": 78.572, "cache_read": 7.857, "batch": 235.715},
+    },
     "GPT 5.4": {
         "global": {"input": 35.714, "output": 214.286, "cache_write": 35.714, "cache_read": 3.571, "batch": 192.857},
         "in_geo": {"input": 39.285, "output": 235.715, "cache_write": 39.285, "cache_read": 3.929, "batch": 212.143},
+        "long_context": {"input": 71.428, "output": 321.429, "cache_write": 71.428, "cache_read": 7.143, "batch": 192.857},
+        "in_geo_long_context": {"input": 78.571, "output": 353.572, "cache_write": 78.571, "cache_read": 7.857, "batch": 212.143},
+    },
+    "GPT 5.4 mini": {
+        "global": {"input": 10.714, "output": 64.286, "cache_write": 10.714, "cache_read": 1.071, "batch": 107.143},
+        "in_geo": {"input": 11.786, "output": 70.714, "cache_write": 11.786, "cache_read": 1.179, "batch": 117.857},
+    },
+    "GPT 5.4 nano": {
+        "global": {"input": 2.857, "output": 17.857, "cache_write": 2.857, "cache_read": 0.286, "batch": 71.429},
+        "in_geo": {"input": 3.143, "output": 19.643, "cache_write": 3.143, "cache_read": 0.314, "batch": 78.571},
     },
     "GPT 5.2/5.3 Codex": {
         "global": {"input": 25.0, "output": 200.0, "cache_write": 25.0, "cache_read": 2.5, "batch": None},
@@ -226,9 +245,11 @@ PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION = {
     },
     "GPT 5.1 Codex Max": {
         "global": {"input": 17.857, "output": 142.857, "cache_write": 17.857, "cache_read": 1.786, "batch": None},
+        "in_geo": {"input": 19.643, "output": 157.143, "cache_write": 19.643, "cache_read": 1.965, "batch": None},
     },
     "GPT 5.1 Codex Mini": {
         "global": {"input": 3.571, "output": 28.571, "cache_write": 3.571, "cache_read": 0.357, "batch": None},
+        "in_geo": {"input": 3.929, "output": 31.429, "cache_write": 3.929, "cache_read": 0.393, "batch": None},
     },
     "GPT 5": {
         "global": {"input": 17.857, "output": 142.857, "cache_write": 17.857, "cache_read": 1.786, "batch": 131.429},
@@ -236,45 +257,44 @@ PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION = {
     },
     "GPT 5 mini": {
         "global": {"input": 3.571, "output": 28.571, "cache_write": 3.571, "cache_read": 0.357, "batch": 71.429},
+        "in_geo": {"input": 3.929, "output": 31.429, "cache_write": 3.929, "cache_read": 0.393, "batch": 78.571},
     },
     "GPT 5 nano": {
         "global": {"input": 0.714, "output": 5.714, "cache_write": 0.714, "cache_read": 0.071, "batch": 53.571},
+        "in_geo": {"input": 0.786, "output": 6.286, "cache_write": 0.786, "cache_read": 0.078, "batch": 58.929},
     },
     # --- Anthropic ---
-    "Claude Opus 4.6": {
+    # Claude Opus 4.5/4.6/4.7 share pricing (combined entry per pricing page); separate endpoints
+    "Claude Opus 4.5/4.6/4.7": {
         "global": {"input": 71.429, "output": 357.143, "cache_write": 89.286, "cache_read": 7.143, "batch": 178.571},
         "in_geo": {"input": 78.571, "output": 392.857, "cache_write": 98.214, "cache_read": 7.857, "batch": 196.429},
-        "long_context": {"input": 142.858, "output": 535.715, "cache_write": 178.572, "cache_read": 14.286, "batch": 178.571},
-    },
-    "Claude Opus 4.5": {
-        "global": {"input": 71.429, "output": 357.143, "cache_write": 89.286, "cache_read": 7.143, "batch": None},
-        "in_geo": {"input": 78.571, "output": 392.857, "cache_write": 98.214, "cache_read": 7.857, "batch": None},
     },
     "Claude Opus 4/4.1": {
         "global": {"input": 214.286, "output": 1071.429, "cache_write": 267.857, "cache_read": 21.429, "batch": 514.286},
-        "in_geo": {"input": 235.715, "output": 1178.572, "cache_write": 294.643, "cache_read": 23.572, "batch": 565.714},
+        "in_geo": {"input": 214.286, "output": 1071.429, "cache_write": 267.857, "cache_read": 21.429, "batch": 514.286},
     },
     "Claude Sonnet 4.5/4.6": {
         "global": {"input": 42.857, "output": 214.286, "cache_write": 53.571, "cache_read": 4.286, "batch": 214.286},
         "in_geo": {"input": 47.143, "output": 235.715, "cache_write": 58.928, "cache_read": 4.715, "batch": 235.715},
-        "long_context": {"input": 85.714, "output": 321.429, "cache_write": 107.143, "cache_read": 8.571, "batch": 214.286},
-        "in_geo_long_context": {"input": 94.285, "output": 353.572, "cache_write": 117.857, "cache_read": 9.428, "batch": 235.715},
     },
-    "Claude Sonnet 3.7/4/4.1": {
+    "Claude Sonnet 4/4.1": {
         "global": {"input": 42.857, "output": 214.286, "cache_write": 53.571, "cache_read": 4.286, "batch": 214.286},
         "in_geo": {"input": 47.143, "output": 235.715, "cache_write": 58.928, "cache_read": 4.715, "batch": 235.715},
         "long_context": {"input": 85.714, "output": 321.429, "cache_write": 107.143, "cache_read": 8.571, "batch": 214.286},
-        "in_geo_long_context": {"input": 94.285, "output": 353.572, "cache_write": 117.857, "cache_read": 9.428, "batch": 235.715},
-    },  # Claude 3.7 Sonnet retiring April 12, 2026
+    },
     "Claude Haiku 4.5": {
-        "global": {"input": 14.286, "output": 71.429, "cache_write": 17.857, "cache_read": 1.429, "batch": None},
-        "in_geo": {"input": 15.715, "output": 78.572, "cache_write": 19.643, "cache_read": 1.572, "batch": None},
+        "global": {"input": 14.286, "output": 71.429, "cache_write": 17.857, "cache_read": 1.429, "batch": 114.286},
+        "in_geo": {"input": 15.715, "output": 78.572, "cache_write": 19.643, "cache_read": 1.572, "batch": 125.714},
     },
     # --- Google ---
     "Gemini 3.1 Pro": {
         "global": {"input": 35.714, "output": 214.286, "cache_write": 35.714, "cache_read": 3.571, "batch": 230.357},
         "in_geo": {"input": 39.285, "output": 235.715, "cache_write": 39.285, "cache_read": 3.929, "batch": 253.393},
         "long_context": {"input": 71.429, "output": 321.429, "cache_write": 71.429, "cache_read": 7.143, "batch": 230.357},
+    },
+    "Gemini 3.1 Flash Lite": {
+        "global": {"input": 3.571, "output": 21.429, "cache_write": 3.571, "cache_read": 0.357, "batch": 71.429},
+        "long_context": {"input": 3.571, "output": 21.429, "cache_write": 3.571, "cache_read": 0.357, "batch": 71.429},
     },
     "Gemini 3.0 Flash": {
         "global": {"input": 8.929, "output": 53.571, "cache_write": 8.929, "cache_read": 0.893, "batch": 125.0},
@@ -286,10 +306,6 @@ PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION = {
     },
     "Gemini 2.5 Flash": {
         "global": {"input": 4.286, "output": 35.714, "cache_write": None, "cache_read": None, "batch": 107.143},
-    },
-    # Gemini 3.1 Flash Lite: PPT rates not yet in Azure pricing table; estimated from Gemini 3.0 Flash class
-    "Gemini 3.1 Flash Lite": {
-        "global": {"input": 4.286, "output": 35.714, "cache_write": None, "cache_read": None, "batch": None},
     },
 }
 
@@ -805,15 +821,21 @@ MODEL_QUALITY_TIER = {
     "GPT 5.2": "frontier",
     "GPT 5.2/5.3 Codex": "frontier",
     "GPT 5.4": "frontier",
+    "GPT 5.4 mini": "mid",
+    "GPT 5.4 nano": "entry",
+    "GPT 5.5": "frontier",
+    "GPT 5.4/5.5 Pro": "frontier",
+    "Qwen3-Embedding-0.6B": "embedding",
+    "Qwen3-Next 80B A3B": "mid-high",
     "Claude Haiku 4.5": "mid",
     "Claude Sonnet 4/4.1": "high",
     "Claude Sonnet 4.5/4.6": "high",
     "Claude Opus 4/4.1": "frontier",
-    "Claude Opus 4.5": "frontier",
-    "Claude Opus 4.6": "frontier",
+    "Claude Opus 4.5/4.6/4.7": "frontier",
     "Gemini 2.5 Flash": "mid",
     "Gemini 2.5 Pro": "high",
     "Gemini 3.0 Flash": "mid",
+    "Gemini 3.1 Flash Lite": "entry",
     "Gemini 3.1 Pro": "frontier",
 }
 
