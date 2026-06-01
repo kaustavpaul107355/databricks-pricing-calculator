@@ -1,6 +1,6 @@
 # Databricks GenAI TCO Estimator
 
-Ballpark pricing and Total Cost of Ownership estimator for GenAI solutions on Databricks. Covers 30 models across 3 clouds and 69 regions, with scenario-based TCO modeling for RAG, multi-agent, batch AI, and fine-tuning workloads.
+Ballpark pricing and Total Cost of Ownership estimator for GenAI solutions on Databricks. Covers **30+ foundation models** across 3 clouds and 69 regions, with scenario-based TCO modeling for RAG, multi-agent, batch AI, and fine-tuning workloads.
 
 Built with **Dash** (Plotly) and **dash-bootstrap-components**. Runs on port 8000.
 
@@ -25,7 +25,10 @@ Built with **Dash** (Plotly) and **dash-bootstrap-components**. Runs on port 800
 ## Quick start
 
 ```bash
-# Install dependencies
+# Install dependencies (pinned — recommended for deploys)
+pip install -r requirements.lock
+
+# Or minimum versions only
 pip install -r requirements.txt
 
 # Run the Dash app (serves on http://localhost:8000)
@@ -33,6 +36,21 @@ python app.py
 ```
 
 Or: `./run_app.sh`
+
+Regenerate lockfiles after changing `requirements.txt`:
+
+```bash
+pip install pip-tools
+pip-compile requirements.txt -o requirements.lock --strip-extras
+pip-compile requirements-dev.txt -o requirements-dev.lock --strip-extras
+```
+
+## Tests
+
+```bash
+pip install -r requirements-dev.lock   # or requirements-dev.txt
+pytest tests/ -q
+```
 
 ## Databricks Apps deployment
 
@@ -54,6 +72,8 @@ python cli.py foundation-model "Llama 3.3 70B" --input-m 10 --output-m 2
 python cli.py vector-search Standard --units 3 --hours 720
 python cli.py serving-gpu XLarge --hours 720
 python cli.py ai-parse 5 "Medium (text + tables + images, e.g. 10-Ks)"
+python cli.py ai-extract 20 "Invoices (~1 page)"
+python cli.py ai-classify 10 "Short text (e.g. news brief)"
 
 # Break-even analysis
 python cli.py breakeven "Llama 3.3 70B" --input-tokens 2000 --output-tokens 500 --qpm 10
@@ -64,7 +84,7 @@ python cli.py compare "Llama 3.3 70B" "GPT 5 mini" "Claude Haiku 4.5" --input-m 
 # Scenario estimates
 python cli.py scenario rag --docs 10000 --queries-day 500
 python cli.py scenario agent --requests-day 1000 --steps 5 --tools 2
-python cli.py scenario batch --docs 50000 --frequency 4
+python cli.py scenario batch --docs 50000 --frequency 4 --extract --classify
 python cli.py scenario fine-tune --model "Llama 3.3 70B" --scale "10M tokens"
 
 # List options
@@ -73,21 +93,40 @@ python cli.py list regions --cloud GCP
 python cli.py list skus --cloud AWS
 ```
 
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | Functional / non-functional requirements and backlog |
+| [docs/DESIGN.md](docs/DESIGN.md) | Architecture, modules, formulas, extension guide |
+| [docs/DEV_LOG.md](docs/DEV_LOG.md) | **Running dev log** — update each build session |
+| [PRICING_SOURCES.md](PRICING_SOURCES.md) | Rate provenance and verification |
+| [docs/PRICING_FITMENT.md](docs/PRICING_FITMENT.md) | Fitment checklist, source URLs, refresh procedure |
+| [STATUS_AND_COVERAGE.md](STATUS_AND_COVERAGE.md) | Legacy coverage matrix (needs refresh for Dash UI) |
+
 ## Project layout
 
 ```
 databricks-pricing-calculator/
+├── docs/
+│   ├── REQUIREMENTS.md # Product requirements (living)
+│   ├── DESIGN.md       # Technical design (living)
+│   └── DEV_LOG.md      # Development log — update as you build
 ├── app.py              # Dash UI (5 tabs, tile grid, frosted-glass theme)
 ├── app.yaml            # Databricks Apps deployment config
 ├── assets/
 │   └── style.css       # Custom CSS (glass effects, tile grid, theme)
 ├── calculator.py       # Atomic estimation functions
 ├── scenarios.py        # Composite scenario estimators + break-even + comparison
+├── ui_helpers.py       # Dropdown options + tier/scale coercion (testable)
 ├── presets.py          # T-shirt sizing presets (S/M/L)
+├── tests/              # pytest (calculator, scenarios, ui_helpers)
 ├── pricing_data.py     # All reference data (models, rates, regions, SKUs)
 ├── cli.py              # Command-line interface
 ├── index.html          # Standalone HTML calculator (deprecated — kept for offline/demo use)
-├── requirements.txt    # Python dependencies (dash, dash-bootstrap-components, plotly)
+├── requirements.txt    # Minimum versions (dash, plotly, pandas, numpy)
+├── requirements.lock   # Pinned transitive deps (pip-compile)
+├── requirements-dev.lock
 ├── run_app.sh          # Local run script
 ├── PRICING_SOURCES.md  # Data sources and verification status
 └── README.md           # This file

@@ -8,6 +8,9 @@ Run: python app.py
 """
 
 import datetime
+
+import pandas as pd  # noqa: F401 — preload before Plotly layout validators (avoids race on startup)
+
 import dash
 from dash import dcc, html, Input, Output, State, callback, no_update
 import dash_bootstrap_components as dbc
@@ -22,20 +25,23 @@ from pricing_data import (
     MODEL_TRAINING_DBU_ESTIMATES,
     AI_PARSE_DOCUMENT_TYPE_LABELS,
     AI_PARSE_DBU_PER_1K_PAGES,
+    AI_EXTRACT_DBU_PER_1K_INPUTS,
+    AI_EXTRACT_WORKLOAD_LABELS,
+    AI_CLASSIFY_DBU_PER_1K_DOCUMENTS,
+    AI_CLASSIFY_WORKLOAD_LABELS,
     AGENT_EVALUATION_DBU,
     FOUNDATION_MODEL_DBU_PER_MILLION,
     PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION,
     MODEL_QUALITY_TIER,
     get_pricing_page_url,
-    get_proprietary_model_rates,
-    get_proprietary_model_tiers,
     get_all_models_with_pt,
 )
 from calculator import (
     estimate_vector_search, estimate_vector_search_reranker,
     estimate_model_serving_cpu, estimate_model_serving_gpu,
     estimate_foundation_model_tokens, estimate_proprietary_foundation_model,
-    estimate_ai_parse, estimate_agent_evaluation, estimate_model_training,
+    estimate_ai_parse, estimate_ai_extract, estimate_ai_classify,
+    estimate_agent_evaluation, estimate_model_training,
     estimate_gateway_payload,
 )
 from scenarios import (
@@ -48,6 +54,24 @@ from scenarios import (
     inference_model_names,
     embedding_model_names,
 )
+from ui_helpers import (
+    GENAI_STORE_KEYS,
+    GENAI_STORE_LABELS,
+    coerce_input,
+    coerce_store_amount,
+    tile_input_hint,
+    checklist_enabled,
+    none_opt_strings,
+    ai_classify_workload_options,
+    ai_extract_workload_options,
+    model_options_with_retirement,
+    parse_complexity_options,
+    proprietary_tier_options,
+    resolve_proprietary_tier,
+    resolve_training_scale,
+    retirement_alert,
+)
+from pricing_data import format_model_option_label
 
 # ---------------------------------------------------------------------------
 # Palette + constants
@@ -98,18 +122,14 @@ def cost_badge(cost, label="monthly"):
         ], color="success", className="py-2 mb-0 mt-2")
     return dbc.Alert("No cost — adjust inputs above", color="light", className="py-2 mb-0 mt-2")
 
-def none_opt(options):
-    """Prepend a '— None —' option to a list."""
-    return [{"label": "— None —", "value": "__none__"}] + [{"label": o, "value": o} for o in options]
-
 def region_options(cloud):
     regions = REGIONS_BY_CLOUD.get(cloud, REGIONS_BY_CLOUD["AWS"])
     return [{"label": f"{label} (${price:.3f}/DBU)", "value": rid}
             for rid, (label, price) in regions.items()]
 
 def _safe(val, default=0):
-    """Coerce a possibly-None input to a number."""
-    return val if val is not None else default
+    """Coerce Dash inputs to float (strings from type=number are common)."""
+    return coerce_input(val, default)
 
 # ---------------------------------------------------------------------------
 # Layout: cloud / region bar
@@ -183,15 +203,18 @@ genai_tab = html.Div([
                  "https://www.databricks.com/product/pricing/agent-bricks", [
             html.Small("CPU for text agents; GPU for vision/multimodal.", className="text-muted d-block mb-1"),
             dbc.Label("Agent type", className="small fw-semibold"),
-            dbc.Select(id="ab-type", options=none_opt(["Knowledge Assistant", "Supervisor Agent"]), value="__none__", className="mb-1"),
-            dbc.RadioItems(id="ab-mode", options=["CPU (typical)", "GPU"], value="CPU (typical)", inline=True, className="mb-1"),
-            html.Div([dbc.Label("Request-hrs / mo", className="small fw-semibold"), dbc.Input(id="ab-cpu-req", type="number", min=0, value=0, step=72, placeholder="e.g. 720")], id="ab-cpu-wrap"),
+            dbc.Select(id="ab-type", options=none_opt_strings(["Knowledge Assistant", "Supervisor Agent"]), value="__none__", className="mb-1"),
+            dbc.RadioItems(id="ab-mode", options=[
+                {"label": "CPU (typical)", "value": "CPU (typical)"},
+                {"label": "GPU", "value": "GPU"},
+            ], value="CPU (typical)", inline=True, className="mb-1"),
+            html.Div([dbc.Label("Request-hrs / mo", className="small fw-semibold"), dbc.Input(id="ab-cpu-req", type="number", min=0, value=None, step=72, placeholder="e.g. 720")], id="ab-cpu-wrap"),
             html.Div([
                 dbc.Label("GPU size", className="small fw-semibold"),
                 dbc.Select(id="ab-gpu-size", options=[{"label": s, "value": s} for s in _gpu_sizes], value="Small", className="mb-1"),
                 dbc.Label("GPU hrs / mo", className="small fw-semibold"),
-                dbc.Input(id="ab-gpu-hrs", type="number", min=0, value=0, step=72, placeholder="e.g. 720"),
-            ], id="ab-gpu-wrap"),
+                dbc.Input(id="ab-gpu-hrs", type="number", min=0, value=None, step=72, placeholder="e.g. 720"),
+            ], id="ab-gpu-wrap", style={"display": "none"}),
             html.Div(id="ab-result"),
         ]), md=6, className="mb-3"),
 
@@ -214,14 +237,17 @@ genai_tab = html.Div([
         dbc.Col(_tile("Model Serving — custom or third-party models",
                  "https://www.databricks.com/product/pricing/model-serving", [
             html.Small("Serve your own models. CPU for lightweight, GPU for large.", className="text-muted d-block mb-1"),
-            dbc.RadioItems(id="serv-mode", options=["CPU", "GPU"], value="CPU", inline=True, className="mb-1"),
-            html.Div([dbc.Label("Request-hrs / mo", className="small fw-semibold"), dbc.Input(id="serv-cpu-req", type="number", min=0, value=0, step=72, placeholder="e.g. 720")], id="serv-cpu-wrap"),
+            dbc.RadioItems(id="serv-mode", options=[
+                {"label": "CPU", "value": "CPU"},
+                {"label": "GPU", "value": "GPU"},
+            ], value="CPU", inline=True, className="mb-1"),
+            html.Div([dbc.Label("Request-hrs / mo", className="small fw-semibold"), dbc.Input(id="serv-cpu-req", type="number", min=0, value=None, step=72, placeholder="e.g. 720")], id="serv-cpu-wrap"),
             html.Div([
                 dbc.Label("GPU size", className="small fw-semibold"),
                 dbc.Select(id="serv-gpu-size", options=[{"label": s, "value": s} for s in _gpu_sizes], value="Small", className="mb-1"),
                 dbc.Label("GPU hrs / mo", className="small fw-semibold"),
-                dbc.Input(id="serv-gpu-hrs", type="number", min=0, value=0, step=72, placeholder="e.g. 720"),
-            ], id="serv-gpu-wrap"),
+                dbc.Input(id="serv-gpu-hrs", type="number", min=0, value=None, step=72, placeholder="e.g. 720"),
+            ], id="serv-gpu-wrap", style={"display": "none"}),
             html.Div(id="serv-result"),
         ]), md=6, className="mb-3"),
 
@@ -230,7 +256,8 @@ genai_tab = html.Div([
                  "https://www.databricks.com/product/pricing/foundation-model-serving", [
             html.Small("Llama, DBRX, etc. Enter token volume or PT hours.", className="text-muted d-block mb-1"),
             dbc.Label("Model", className="small fw-semibold"),
-            dbc.Select(id="fm-model", options=none_opt(_open_models), value="__none__", className="mb-1"),
+            dbc.Select(id="fm-model", options=model_options_with_retirement(_open_models), value="__none__", className="mb-1"),
+            html.Div(id="fm-retire-notice"),
             dbc.Row([
                 dbc.Col([dbc.Label("Input (M tok)", className="small fw-semibold"), dbc.Input(id="fm-in", type="number", min=0, value=0, step=0.5, placeholder="e.g. 10")], md=4),
                 dbc.Col([dbc.Label("Output (M tok)", className="small fw-semibold"), dbc.Input(id="fm-out", type="number", min=0, value=0, step=0.5, placeholder="e.g. 2")], md=4),
@@ -243,10 +270,12 @@ genai_tab = html.Div([
         dbc.Col(_tile("Proprietary Model — OpenAI, Anthropic, Google",
                  "https://www.databricks.com/product/pricing/proprietary-foundation-model-serving", [
             html.Small("GPT-4o, Claude, Gemini via Databricks. Cache & Batch are optional.", className="text-muted d-block mb-1"),
+            html.Small(" 20% Gemini promo through June 2026", className="text-success fw-bold d-block mb-1") if PROMO_ACTIVE else None,
             dbc.Row([
-                dbc.Col([dbc.Label("Model", className="small fw-semibold"), dbc.Select(id="prop-model", options=none_opt(_prop_models), value="__none__")], md=6),
-                dbc.Col([dbc.Label("Tier", className="small fw-semibold"), dbc.RadioItems(id="prop-tier", options=[], value=None, inline=True, className="mt-1")], md=6),
+                dbc.Col([dbc.Label("Model", className="small fw-semibold"), dbc.Select(id="prop-model", options=model_options_with_retirement(_prop_models), value="__none__")], md=6),
+                dbc.Col([dbc.Label("Tier", className="small fw-semibold"), dbc.Select(id="prop-tier", options=[], value=None, className="mt-1")], md=6),
             ], className="g-2 mb-1"),
+            html.Div(id="prop-retire-notice"),
             dbc.Row([
                 dbc.Col([dbc.Label("Input (M)", className="small fw-semibold"), dbc.Input(id="prop-in", type="number", min=0, value=0, step=0.5, placeholder="e.g. 10")], md=3),
                 dbc.Col([dbc.Label("Output (M)", className="small fw-semibold"), dbc.Input(id="prop-out", type="number", min=0, value=0, step=0.5, placeholder="e.g. 2")], md=3),
@@ -254,6 +283,9 @@ genai_tab = html.Div([
                 dbc.Col([dbc.Label("Cache R (M)", className="small fw-semibold"), dbc.Input(id="prop-cr", type="number", min=0, value=0, step=0.5, placeholder="0")], md=2),
                 dbc.Col([dbc.Label("Batch hrs", className="small fw-semibold"), dbc.Input(id="prop-batch", type="number", min=0, value=0, step=1, placeholder="0")], md=2),
             ], className="g-2"),
+            dbc.Checklist(id="prop-gemini-promo", options=[{"label": " Apply 20% Gemini promo", "value": "yes"}],
+                          value=["yes"] if PROMO_ACTIVE else [], className="mt-2",
+                          style={"display": "block" if PROMO_ACTIVE else "none"}),
             html.Div(id="prop-result"),
         ]), md=12, className="mb-3"),
 
@@ -263,7 +295,7 @@ genai_tab = html.Div([
             html.Small("Convert PDFs, images, scans into structured data.", className="text-muted d-block"),
             html.Small(" 50% promo through June 2026", className="text-success fw-bold d-block mb-1") if PROMO_ACTIVE else None,
             dbc.Label("Document complexity", className="small fw-semibold"),
-            dbc.Select(id="parse-type", options=none_opt([lbl for lbl, _ in AI_PARSE_DOCUMENT_TYPE_LABELS]),
+            dbc.Select(id="parse-type", options=parse_complexity_options(),
                        value="__none__", className="mb-1"),
             dbc.Row([
                 dbc.Col([dbc.Label("Pages (thousands / mo)", className="small fw-semibold"), dbc.Input(id="parse-pages", type="number", min=0, value=0, step=0.5, placeholder="e.g. 100")], md=8),
@@ -274,12 +306,44 @@ genai_tab = html.Div([
             html.Div(id="parse-result"),
         ]), md=6, className="mb-3"),
 
+        # 8b. AI Extract
+        dbc.Col(_tile("AI Extract — schema-based extraction",
+                 "https://www.databricks.com/product/pricing/ai-parse", [
+            html.Small("Extract fields from parsed documents (requires ai_parse_document upstream).", className="text-muted d-block"),
+            html.Small(" 50% promo through June 2026", className="text-success fw-bold d-block mb-1") if PROMO_ACTIVE else None,
+            dbc.Label("Workload", className="small fw-semibold"),
+            dbc.Select(id="extract-type", options=ai_extract_workload_options(), value="__none__", className="mb-1"),
+            dbc.Row([
+                dbc.Col([dbc.Label("Inputs (thousands / mo)", className="small fw-semibold"), dbc.Input(id="extract-vol", type="number", min=0, value=0, step=0.5, placeholder="e.g. 50")], md=8),
+                dbc.Col(dbc.Checklist(id="extract-promo", options=[{"label": " 50% promo", "value": "yes"}],
+                                      value=["yes"] if PROMO_ACTIVE else [], className="mt-3",
+                                      style={"display": "block" if PROMO_ACTIVE else "none"}), md=4),
+            ], className="g-2"),
+            html.Div(id="extract-result"),
+        ]), md=6, className="mb-3"),
+
+        # 8c. AI Classify
+        dbc.Col(_tile("AI Classify — schema-based classification",
+                 "https://www.databricks.com/product/pricing/ai-parse", [
+            html.Small("Classify parsed documents by schema (requires ai_parse_document upstream).", className="text-muted d-block"),
+            html.Small(" 50% promo through June 2026", className="text-success fw-bold d-block mb-1") if PROMO_ACTIVE else None,
+            dbc.Label("Workload", className="small fw-semibold"),
+            dbc.Select(id="classify-type", options=ai_classify_workload_options(), value="__none__", className="mb-1"),
+            dbc.Row([
+                dbc.Col([dbc.Label("Documents (thousands / mo)", className="small fw-semibold"), dbc.Input(id="classify-vol", type="number", min=0, value=0, step=0.5, placeholder="e.g. 20")], md=8),
+                dbc.Col(dbc.Checklist(id="classify-promo", options=[{"label": " 50% promo", "value": "yes"}],
+                                      value=["yes"] if PROMO_ACTIVE else [], className="mt-3",
+                                      style={"display": "block" if PROMO_ACTIVE else "none"}), md=4),
+            ], className="g-2"),
+            html.Div(id="classify-result"),
+        ]), md=6, className="mb-3"),
+
         # 9. Agent Evaluation
         dbc.Col(_tile("Agent Evaluation — LLM Judge & Synthetic Data",
                  "https://www.databricks.com/product/pricing/agent-evaluation", [
             html.Small("LLM-as-a-Judge and synthetic data generation.", className="text-muted d-block mb-1"),
             dbc.Label("Type", className="small fw-semibold"),
-            dbc.Select(id="eval-type", options=none_opt(_eval_types), value="__none__", className="mb-1"),
+            dbc.Select(id="eval-type", options=none_opt_strings(_eval_types), value="__none__", className="mb-1"),
             dbc.Row([
                 dbc.Col([dbc.Label("Input (M)", className="small fw-semibold"), dbc.Input(id="eval-in", type="number", min=0, value=0, step=0.5, placeholder="e.g. 1")], md=4),
                 dbc.Col([dbc.Label("Output (M)", className="small fw-semibold"), dbc.Input(id="eval-out", type="number", min=0, value=0, step=0.5, placeholder="e.g. 0.5")], md=4),
@@ -293,7 +357,7 @@ genai_tab = html.Div([
                  "https://www.databricks.com/product/pricing/mosaic-foundation-model-training", [
             html.Small("One-time cost. Pick base model and training scale.", className="text-muted d-block mb-1"),
             dbc.Row([
-                dbc.Col([dbc.Label("Base model", className="small fw-semibold"), dbc.Select(id="train-model", options=none_opt(_train_models), value="__none__")], md=6),
+                dbc.Col([dbc.Label("Base model", className="small fw-semibold"), dbc.Select(id="train-model", options=none_opt_strings(_train_models), value="__none__")], md=6),
                 dbc.Col([dbc.Label("Training scale", className="small fw-semibold"), dbc.Select(id="train-scale", options=[], value=None)], md=6),
             ], className="g-2"),
             html.Div(id="train-result", className="mt-2"),
@@ -301,8 +365,7 @@ genai_tab = html.Div([
     ], className="tile-grid"),
 
     # Stores for per-section costs
-    *[dcc.Store(id=f"store-{s}", data=0) for s in
-      ["vs", "reranker", "ab", "gw", "serv", "fm", "prop", "parse", "eval"]],
+    *[dcc.Store(id=f"store-{s}", data=0) for s in GENAI_STORE_KEYS],
     dcc.Store(id="store-train", data=0),
 
     # Total summary
@@ -323,7 +386,10 @@ breakeven_tab = html.Div([
     html.P("Find where Provisioned Throughput becomes cheaper than Pay-Per-Token.", className="text-muted small mb-3"),
     dbc.Row([
         dbc.Col([
-            dbc.Label("Model"), dbc.Select(id="be-model", options=[{"label": m, "value": m} for m in _pt_models], value=_pt_models[0] if _pt_models else None),
+            dbc.Label("Model"), dbc.Select(id="be-model",
+                options=[{"label": format_model_option_label(m), "value": m} for m in _pt_models],
+                value=_pt_models[0] if _pt_models else None),
+            html.Div(id="be-retire-notice"),
             dbc.Label("Avg input tokens/query", className="mt-2"), dbc.Input(id="be-input", type="number", min=100, value=2000, step=500),
             dbc.Label("Queries per minute", className="mt-2"), dbc.Input(id="be-qpm", type="number", min=0.1, value=5, step=0.5),
         ], md=4),
@@ -345,7 +411,8 @@ comparison_tab = html.Div([
     html.H4("Model Cost Comparison", className="mb-1"),
     html.P("Compare monthly token costs across 2-3 models for the same traffic.", className="text-muted small mb-3"),
     dbc.Label("Select 2-3 models"),
-    dcc.Dropdown(id="mc-models", options=[{"label": m, "value": m} for m in _all_inf_models],
+    dcc.Dropdown(id="mc-models",
+                 options=[{"label": format_model_option_label(m), "value": m} for m in _all_inf_models],
                  multi=True, placeholder="Pick 2-3 models..."),
     dbc.Row([
         dbc.Col([dbc.Label("Input tokens (M/month)", className="mt-2"),
@@ -410,11 +477,27 @@ scenarios_tab = html.Div([
                 dbc.Label("Pages per doc", className="mt-2"), dbc.Input(id="scn-batch-pages", type="number", min=1, value=5),
             ], md=6),
             dbc.Col([
-                dbc.Label("Complexity"), dbc.Select(id="scn-batch-cx", options=[{"label": k, "value": k} for k in AI_PARSE_DBU_PER_1K_PAGES], value=list(AI_PARSE_DBU_PER_1K_PAGES.keys())[2]),
+                dbc.Label("Parse complexity"), dbc.Select(id="scn-batch-cx", options=[{"label": k, "value": k} for k in AI_PARSE_DBU_PER_1K_PAGES], value=list(AI_PARSE_DBU_PER_1K_PAGES.keys())[2]),
                 dbc.Label("Runs per month", className="mt-2"), dbc.Input(id="scn-batch-freq", type="number", min=1, value=4),
                 dbc.Label("Output model", className="mt-2"), dbc.Select(id="scn-batch-model", options=[{"label": m, "value": m} for m in _inf_models_list], value=_inf_models_list[0] if _inf_models_list else None),
             ], md=6),
         ], className="g-3 mt-2"),
+        html.Small("Optional: Extract/Classify run after parse (1 input/doc). AI Functions 50% promo applied when active.",
+                   className="text-muted d-block mt-2"),
+        dbc.Row([
+            dbc.Col([
+                dbc.Checklist(id="scn-batch-extract", options=[{"label": " AI Extract", "value": "yes"}], value=[], className="mb-1"),
+                dbc.Select(id="scn-batch-extract-wl",
+                           options=[{"label": lbl, "value": key} for lbl, key in AI_EXTRACT_WORKLOAD_LABELS],
+                           value=AI_EXTRACT_WORKLOAD_LABELS[0][1]),
+            ], md=6),
+            dbc.Col([
+                dbc.Checklist(id="scn-batch-classify", options=[{"label": " AI Classify", "value": "yes"}], value=[], className="mb-1"),
+                dbc.Select(id="scn-batch-classify-wl",
+                           options=[{"label": lbl, "value": key} for lbl, key in AI_CLASSIFY_WORKLOAD_LABELS],
+                           value=AI_CLASSIFY_WORKLOAD_LABELS[0][1]),
+            ], md=6),
+        ], className="g-3 mt-1"),
     ]),
 
     # Fine-Tune form
@@ -503,9 +586,13 @@ app.layout = html.Div([
 
 # --- Region dropdown update ---
 @callback(Output("region", "options"), Output("region", "value"),
-          Input("cloud", "value"))
-def update_regions(cloud):
+          Input("cloud", "value"),
+          State("region", "value"))
+def update_regions(cloud, current_region):
     opts = region_options(cloud)
+    valid = {o["value"] for o in opts}
+    if current_region in valid:
+        return opts, current_region
     return opts, opts[0]["value"] if opts else None
 
 # --- GenAI: per-section callbacks ---
@@ -517,7 +604,7 @@ def update_regions(cloud):
 def calc_vs(tier, units, hours, cloud, region):
     units, hours = _safe(units), _safe(hours)
     if units <= 0 or hours <= 0:
-        return None, 0
+        return tile_input_hint("Enter endpoint count and hours per month."), 0
     try:
         r = estimate_vector_search(tier, int(units), hours, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
@@ -529,7 +616,7 @@ def calc_vs(tier, units, hours, cloud, region):
 def calc_reranker(req_1k, cloud, region):
     req_1k = _safe(req_1k)
     if req_1k <= 0:
-        return None, 0
+        return tile_input_hint("Enter requests (thousands per month)."), 0
     r = estimate_vector_search_reranker(req_1k, cloud=cloud, region=region)
     return cost_badge(r.cost_usd), r.cost_usd
 
@@ -542,28 +629,35 @@ def calc_ab(ab_type, mode, cpu_req, gpu_size, gpu_hrs, cloud, region):
     cpu_show = {"display": "block"} if mode == "CPU (typical)" else {"display": "none"}
     gpu_show = {"display": "block"} if mode == "GPU" else {"display": "none"}
     if ab_type == "__none__":
-        return None, 0, cpu_show, gpu_show
-    if mode == "CPU (typical)":
-        cpu_req = _safe(cpu_req)
-        if cpu_req <= 0:
-            return None, 0, cpu_show, gpu_show
-        r = estimate_model_serving_cpu(cpu_req, cloud=cloud, region=region)
-    else:
-        gpu_hrs = _safe(gpu_hrs)
-        if gpu_hrs <= 0:
-            return None, 0, cpu_show, gpu_show
-        r = estimate_model_serving_gpu(gpu_size, gpu_hrs, cloud=cloud, region=region)
-    return cost_badge(r.cost_usd), r.cost_usd, cpu_show, gpu_show
+        return tile_input_hint("Select an agent type."), 0, cpu_show, gpu_show
+    try:
+        if mode == "CPU (typical)":
+            cpu_req = _safe(cpu_req)
+            if cpu_req <= 0:
+                return tile_input_hint("Enter request-hrs per month."), 0, cpu_show, gpu_show
+            r = estimate_model_serving_cpu(cpu_req, cloud=cloud, region=region)
+        else:
+            gpu_hrs = _safe(gpu_hrs)
+            if gpu_hrs <= 0:
+                return tile_input_hint("Enter GPU hours per month."), 0, cpu_show, gpu_show
+            r = estimate_model_serving_gpu(gpu_size, gpu_hrs, cloud=cloud, region=region)
+        return cost_badge(r.cost_usd), r.cost_usd, cpu_show, gpu_show
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0, cpu_show, gpu_show
 
 @callback(Output("gw-result", "children"), Output("store-gw", "data"),
           Input("gw-features", "value"), Input("gw-payload", "value"),
           Input("cloud", "value"), Input("region", "value"))
 def calc_gw(features, payload, cloud, region):
+    features = features or []
     payload = _safe(payload)
-    if not features or payload <= 0:
-        if features and "guard" in features and not ("inf" in features or "usage" in features):
-            return dbc.Alert("Guardrails cost is part of Model Serving / Agent Bricks.", color="info", className="py-2 mt-2"), 0
-        return None, 0
+    needs_payload = "inf" in features or "usage" in features
+    if "guard" in features and not needs_payload:
+        return dbc.Alert("Guardrails cost is part of Model Serving / Agent Bricks.", color="info", className="py-2 mt-2"), 0
+    if not needs_payload:
+        return tile_input_hint("Select Inference Tables and/or Usage Tracking, or use Guardrails only (no extra charge)."), 0
+    if payload <= 0:
+        return dbc.Alert("Enter payload (GB/month) for Inference Tables or Usage Tracking.", color="light", className="py-2 mt-2"), 0
     r = estimate_gateway_payload(payload, cloud=cloud, region=region)
     return cost_badge(r.cost_usd), r.cost_usd
 
@@ -575,32 +669,52 @@ def calc_gw(features, payload, cloud, region):
 def calc_serv(mode, cpu_req, gpu_size, gpu_hrs, cloud, region):
     cpu_show = {"display": "block"} if mode == "CPU" else {"display": "none"}
     gpu_show = {"display": "block"} if mode == "GPU" else {"display": "none"}
-    if mode == "CPU":
-        cpu_req = _safe(cpu_req)
-        if cpu_req <= 0:
-            return None, 0, cpu_show, gpu_show
-        r = estimate_model_serving_cpu(cpu_req, cloud=cloud, region=region)
-    else:
-        gpu_hrs = _safe(gpu_hrs)
-        if gpu_hrs <= 0:
-            return None, 0, cpu_show, gpu_show
-        r = estimate_model_serving_gpu(gpu_size, gpu_hrs, cloud=cloud, region=region)
-    return cost_badge(r.cost_usd), r.cost_usd, cpu_show, gpu_show
+    try:
+        if mode == "CPU":
+            cpu_req = _safe(cpu_req)
+            if cpu_req <= 0:
+                return tile_input_hint("Enter request-hrs per month (concurrent request-hours)."), 0, cpu_show, gpu_show
+            r = estimate_model_serving_cpu(cpu_req, cloud=cloud, region=region)
+        else:
+            gpu_hrs = _safe(gpu_hrs)
+            if gpu_hrs <= 0:
+                return tile_input_hint("Enter GPU hours per month."), 0, cpu_show, gpu_show
+            if not gpu_size:
+                return dbc.Alert("Select a GPU size.", color="warning", className="py-2 mt-2"), 0, cpu_show, gpu_show
+            r = estimate_model_serving_gpu(gpu_size, gpu_hrs, cloud=cloud, region=region)
+        return cost_badge(r.cost_usd), r.cost_usd, cpu_show, gpu_show
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0, cpu_show, gpu_show
 
 @callback(Output("fm-result", "children"), Output("store-fm", "data"),
           Input("fm-model", "value"), Input("fm-in", "value"), Input("fm-out", "value"), Input("fm-pt", "value"),
           Input("cloud", "value"), Input("region", "value"))
 def calc_fm(model, fm_in, fm_out, fm_pt, cloud, region):
     if model == "__none__":
-        return None, 0
+        return tile_input_hint("Select a foundation model."), 0
     fm_in, fm_out, fm_pt = _safe(fm_in), _safe(fm_out), _safe(fm_pt)
     if fm_in <= 0 and fm_out <= 0 and fm_pt <= 0:
-        return None, 0
+        return tile_input_hint("Enter input/output tokens (M) and/or PT hours per month."), 0
     try:
         r = estimate_foundation_model_tokens(model, input_millions=fm_in, output_millions=fm_out, provisioned_hours=fm_pt, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
     except Exception as e:
         return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
+
+@callback(Output("prop-retire-notice", "children"), Input("prop-model", "value"))
+def show_prop_retire(model):
+    return retirement_alert(model)
+
+
+@callback(Output("fm-retire-notice", "children"), Input("fm-model", "value"))
+def show_fm_retire(model):
+    return retirement_alert(model)
+
+
+@callback(Output("be-retire-notice", "children"), Input("be-model", "value"))
+def show_be_retire(model):
+    return retirement_alert(model)
+
 
 # Proprietary FM: update tier options when model changes
 @callback(Output("prop-tier", "options"), Output("prop-tier", "value"),
@@ -608,26 +722,28 @@ def calc_fm(model, fm_in, fm_out, fm_pt, cloud, region):
 def update_prop_tiers(model):
     if model == "__none__":
         return [], None
-    tiers = get_proprietary_model_tiers(model)
-    labels = {"global": "Global", "in_geo": "In-Geo (~10%)", "long_context": "Long Context", "in_geo_long_context": "In-Geo + Long"}
-    opts = [{"label": labels.get(t, t), "value": t} for t in tiers]
-    return opts, tiers[0] if tiers else None
+    opts = proprietary_tier_options(model)
+    return opts, opts[0]["value"] if opts else None
 
 @callback(Output("prop-result", "children"), Output("store-prop", "data"),
           Input("prop-model", "value"), Input("prop-tier", "value"),
           Input("prop-in", "value"), Input("prop-out", "value"),
           Input("prop-cw", "value"), Input("prop-cr", "value"), Input("prop-batch", "value"),
+          Input("prop-gemini-promo", "value"),
           Input("cloud", "value"), Input("region", "value"))
-def calc_prop(model, tier, p_in, p_out, cw, cr, batch, cloud, region):
+def calc_prop(model, tier, p_in, p_out, cw, cr, batch, gemini_promo, cloud, region):
+    tier = resolve_proprietary_tier(model, tier)
     if model == "__none__" or not tier:
-        return None, 0
+        return tile_input_hint("Select a proprietary model and tier."), 0
     p_in, p_out, cw, cr, batch = _safe(p_in), _safe(p_out), _safe(cw), _safe(cr), _safe(batch)
     if p_in <= 0 and p_out <= 0 and cw <= 0 and cr <= 0 and batch <= 0:
-        return None, 0
+        return tile_input_hint("Enter input/output tokens (M), cache volumes, and/or batch hours."), 0
     try:
+        apply_gemini = checklist_enabled(gemini_promo) if model.startswith("Gemini") else False
         r = estimate_proprietary_foundation_model(model, input_millions=p_in, output_millions=p_out,
                                                    tier=tier, cache_write_millions=cw, cache_read_millions=cr,
-                                                   batch_hours=batch, cloud=cloud, region=region)
+                                                   batch_hours=batch, cloud=cloud, region=region,
+                                                   apply_gemini_promo=apply_gemini)
         return cost_badge(r.cost_usd), r.cost_usd
     except Exception as e:
         return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
@@ -637,26 +753,60 @@ def calc_prop(model, tier, p_in, p_out, cw, cr, batch, cloud, region):
           Input("cloud", "value"), Input("region", "value"))
 def calc_parse(doc_type, pages, promo, cloud, region):
     if doc_type == "__none__":
-        return None, 0
+        return tile_input_hint("Select document complexity."), 0
     pages = _safe(pages)
     if pages <= 0:
-        return None, 0
-    complexity_key = next((k for lbl, k in AI_PARSE_DOCUMENT_TYPE_LABELS if lbl == doc_type), None)
+        return tile_input_hint("Enter pages per month (thousands)."), 0
+    complexity_key = doc_type if doc_type in AI_PARSE_DBU_PER_1K_PAGES else None
     if not complexity_key:
-        return None, 0
-    apply_promo = "yes" in (promo or [])
+        return dbc.Alert("Unknown document complexity — re-select from the list.", color="warning", className="py-2 mt-2"), 0
+    apply_promo = checklist_enabled(promo)
     r = estimate_ai_parse(pages, complexity_key, cloud=cloud, region=region, apply_promo=apply_promo)
     return cost_badge(r.cost_usd), r.cost_usd
+
+@callback(Output("extract-result", "children"), Output("store-extract", "data"),
+          Input("extract-type", "value"), Input("extract-vol", "value"), Input("extract-promo", "value"),
+          Input("cloud", "value"), Input("region", "value"))
+def calc_extract(workload, vol, promo, cloud, region):
+    if workload == "__none__":
+        return tile_input_hint("Select an extract workload type."), 0
+    vol = _safe(vol)
+    if vol <= 0:
+        return tile_input_hint("Enter volume (thousands of inputs per month)."), 0
+    if workload not in AI_EXTRACT_DBU_PER_1K_INPUTS:
+        return dbc.Alert("Select a workload type.", color="warning", className="py-2 mt-2"), 0
+    try:
+        r = estimate_ai_extract(vol, workload, cloud=cloud, region=region, apply_promo=checklist_enabled(promo))
+        return cost_badge(r.cost_usd), r.cost_usd
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
+
+@callback(Output("classify-result", "children"), Output("store-classify", "data"),
+          Input("classify-type", "value"), Input("classify-vol", "value"), Input("classify-promo", "value"),
+          Input("cloud", "value"), Input("region", "value"))
+def calc_classify(workload, vol, promo, cloud, region):
+    if workload == "__none__":
+        return tile_input_hint("Select a classify workload type."), 0
+    vol = _safe(vol)
+    if vol <= 0:
+        return tile_input_hint("Enter volume (thousands of documents per month)."), 0
+    if workload not in AI_CLASSIFY_DBU_PER_1K_DOCUMENTS:
+        return dbc.Alert("Select a workload type.", color="warning", className="py-2 mt-2"), 0
+    try:
+        r = estimate_ai_classify(vol, workload, cloud=cloud, region=region, apply_promo=checklist_enabled(promo))
+        return cost_badge(r.cost_usd), r.cost_usd
+    except Exception as e:
+        return dbc.Alert(str(e), color="warning", className="py-2 mt-2"), 0
 
 @callback(Output("eval-result", "children"), Output("store-eval", "data"),
           Input("eval-type", "value"), Input("eval-in", "value"), Input("eval-out", "value"), Input("eval-q", "value"),
           Input("cloud", "value"), Input("region", "value"))
 def calc_eval(eval_type, e_in, e_out, e_q, cloud, region):
     if eval_type == "__none__":
-        return None, 0
+        return tile_input_hint("Select an evaluation type."), 0
     e_in, e_out, e_q = _safe(e_in), _safe(e_out), _safe(e_q)
     if e_in <= 0 and e_out <= 0 and e_q <= 0:
-        return None, 0
+        return tile_input_hint("Enter input/output tokens (M) and/or questions per month."), 0
     try:
         r = estimate_agent_evaluation(eval_type, input_millions=e_in, output_millions=e_out, questions=e_q, cloud=cloud, region=region)
         return cost_badge(r.cost_usd), r.cost_usd
@@ -677,8 +827,9 @@ def update_train_scales(model):
           Input("train-model", "value"), Input("train-scale", "value"),
           Input("cloud", "value"), Input("region", "value"))
 def calc_train(model, scale, cloud, region):
+    scale = resolve_training_scale(model, scale)
     if model == "__none__" or not scale:
-        return None, 0
+        return tile_input_hint("Select a model and training scale."), 0
     try:
         r = estimate_model_training(model, scale, cloud=cloud, region=region)
         return dbc.Alert(f"One-time training: ${r.cost_usd:,.2f}", color="info", className="py-2"), r.cost_usd
@@ -687,19 +838,32 @@ def calc_train(model, scale, cloud, region):
 
 # --- GenAI: total summary ---
 @callback(Output("genai-total", "children"), Output("genai-training-total", "children"),
-          *[Input(f"store-{s}", "data") for s in ["vs", "reranker", "ab", "gw", "serv", "fm", "prop", "parse", "eval"]],
+          Output("genai-line-items", "children"),
+          *[Input(f"store-{s}", "data") for s in GENAI_STORE_KEYS],
           Input("store-train", "data"))
-def genai_total(vs, reranker, ab, gw, serv, fm, prop, parse_cost, eval_cost, train):
-    monthly = sum(c for c in [vs, reranker, ab, gw, serv, fm, prop, parse_cost, eval_cost] if c)
+def genai_total(*store_amounts):
+    """Aggregate dcc.Store costs into monthly total, training, and line-item list."""
+    train = store_amounts[-1]
+    costs = dict(zip(GENAI_STORE_KEYS, store_amounts[:-1]))
+    monthly = sum(coerce_store_amount(c) for c in costs.values())
     monthly_el = html.Div([
         html.Span("Estimated monthly: ", className="fw-bold"),
         html.Span(f"${monthly:,.2f}", className="fs-4 fw-bold", style={"color": DB_TEAL}),
     ])
+    train_amt = coerce_store_amount(train)
     train_el = html.Div([
         html.Span("One-time training: ", className="fw-bold"),
-        html.Span(f"${train:,.2f}", style={"color": DB_DARK}),
-    ]) if train > 0 else None
-    return monthly_el, train_el
+        html.Span(f"${train_amt:,.2f}", style={"color": DB_DARK}),
+    ]) if train_amt > 0 else None
+    line_items = []
+    for key, amount in costs.items():
+        amt = coerce_store_amount(amount)
+        if amt > 0:
+            line_items.append(html.Li(f"{GENAI_STORE_LABELS[key]}: ${amt:,.2f}"))
+    line_el = html.Ul(line_items, className="small mb-0") if line_items else html.P(
+        "No line items yet — configure services above.", className="text-muted small mb-0"
+    )
+    return monthly_el, train_el, line_el
 
 # --- Break-Even ---
 @callback(Output("be-metrics", "children"), Output("be-chart", "children"),
@@ -805,6 +969,8 @@ def update_ft_scales(model):
           Input("scn-batch-docs", "value"), Input("scn-batch-pages", "value"),
           Input("scn-batch-cx", "value"), Input("scn-batch-freq", "value"),
           Input("scn-batch-model", "value"),
+          Input("scn-batch-extract", "value"), Input("scn-batch-extract-wl", "value"),
+          Input("scn-batch-classify", "value"), Input("scn-batch-classify-wl", "value"),
           # Fine-tune inputs
           Input("scn-ft-model", "value"), Input("scn-ft-scale", "value"),
           Input("scn-ft-hrs", "value"), Input("scn-ft-retrain", "value"),
@@ -814,6 +980,7 @@ def update_ft_scales(model):
 def calc_scenario(scn, rag_docs, rag_pages, rag_chunks, rag_qday, rag_emb, rag_llm, rag_cx, rag_refresh,
                   ma_req, ma_steps, ma_tools, ma_orch, ma_worker, ma_vs,
                   batch_docs, batch_pages, batch_cx, batch_freq, batch_model,
+                  batch_extract, batch_extract_wl, batch_classify, batch_classify_wl,
                   ft_model, ft_scale, ft_hrs, ft_retrain, ft_eval_freq, ft_eval_q,
                   cloud, region):
     try:
@@ -828,11 +995,17 @@ def calc_scenario(scn, rag_docs, rag_pages, rag_chunks, rag_qday, rag_emb, rag_l
                 avg_steps_per_request=int(_safe(ma_steps, 5)),
                 tools_per_step=int(_safe(ma_tools, 2)),
                 orchestrator_model=ma_orch, worker_model=ma_worker,
-                include_vector_search=bool(ma_vs), cloud=cloud, region=region)
+                include_vector_search=checklist_enabled(ma_vs), cloud=cloud, region=region)
         elif scn == "Batch AI Pipeline":
             result = estimate_batch_pipeline_scenario(
                 int(_safe(batch_docs, 10000)), _safe(batch_pages, 5), batch_cx,
-                int(_safe(batch_freq, 4)), batch_model, cloud=cloud, region=region)
+                int(_safe(batch_freq, 4)), batch_model,
+                include_extract=checklist_enabled(batch_extract),
+                extract_workload=batch_extract_wl,
+                include_classify=checklist_enabled(batch_classify),
+                classify_workload=batch_classify_wl,
+                cloud=cloud, region=region,
+            )
         elif scn == "Fine-Tuned Model":
             if not ft_model or not ft_scale:
                 return dbc.Alert("Select a model and scale.", color="light")
@@ -902,4 +1075,6 @@ def calc_quick(qe_type, size, cloud, region):
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    import os
+    port = int(os.environ.get("PORT", "8000"))
+    app.run(host="0.0.0.0", port=port, debug=False)

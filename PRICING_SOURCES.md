@@ -2,7 +2,8 @@
 
 This document tracks every source used to populate `pricing_data.py`, the verification status of each data point, and when the data was last refreshed.
 
-**Last comprehensive refresh:** 2026-05-04
+**Last comprehensive refresh:** 2026-05-04  
+**Last fitment pass (Gemini / proprietary churn):** 2026-05-30 — see [docs/PRICING_FITMENT.md](docs/PRICING_FITMENT.md)  
 **Previous refresh:** 2026-04-07
 
 ---
@@ -58,10 +59,11 @@ This document tracks every source used to populate `pricing_data.py`, the verifi
   - **Removed:** fabricated long_context tier from former Claude Opus 4.6 entry (combined Opus 4.5/4.6/4.7 has no long_context per page)
   - All other proprietary FM rates verified unchanged.
 
-### 4. Databricks AI Parse Pricing
+### 4. Databricks AI Functions Pricing (Parse, Extract, Classify)
 - **URL:** https://www.databricks.com/product/pricing/ai-parse
-- **What it provides:** DBU per 1K pages by complexity tier, promotional discount
-- **Verification (2026-05-04):** All four tiers and 50% promo through 2026-06-30 confirmed against page and Azure Learn doc.
+- **What it provides:** DBU per 1K pages (Parse complexity tiers), DBU per 1K inputs (Extract workloads), DBU per 1K documents (Classify workloads), 50% promotional discount on all three through 2026-06-30
+- **Verification (2026-05-04):** Parse tiers and promo confirmed against page and Azure Learn doc.
+- **Verification (2026-05-30):** Extract midpoints (45 / 67.5 DBU per 1k inputs) and Classify midpoints (4.5 / 50 DBU per 1k documents) added per pricing page workload tables.
 
 ### 5. Databricks Model Training Pricing
 - **URL:** https://www.databricks.com/product/pricing/mosaic-foundation-model-training
@@ -193,12 +195,14 @@ This document tracks every source used to populate `pricing_data.py`, the verifi
 | 2026-04-07 | Initial comprehensive | Established `pricing_data.py` from 17 sources; flagged JS-rendered pages as unverified |
 | 2026-04-08 | Targeted refresh | Added Qwen3-Embedding-0.6B, Qwen3-Next 80B A3B (estimated rates), Gemini 3.1 Flash Lite (estimated rates); fixed Claude Opus/Haiku 4.5 batch to None per Azure pricing table; renamed Claude Sonnet 4/4.1 → 3.7/4/4.1 |
 | 2026-05-04 | Full audit | Cross-verified all FM rates against pricing page + Azure Learn; replaced estimated Qwen3/Gemini Flash Lite rates with actuals; added GPT 5.5, GPT 5.4/5.5 Pro, GPT 5.4 mini, GPT 5.4 nano; added in_geo tiers for GPT 5 mini/nano + 5.1 Codex Max/Mini; consolidated Claude Opus 4.5/4.6/4.7 into single entry; renamed Sonnet 3.7/4/4.1 → 4/4.1 (3.7 retired); removed fabricated long_context tiers from Sonnet 4.5/4.6 + Opus 4.5/4.6/4.7; populated scaling_capacity_per_hour for all open FMs; fixed Claude Haiku 4.5 batch rates |
+| 2026-05-30 | Fitment pass | Azure Learn footer **2026-04-21**; proprietary page cross-check: updated Gemini 3.1 Flash Lite, 2.5 Pro/Flash, 3.1 Pro batch; added Gemini 3.5 Flash, 2.5 Flash Lite, Claude Opus 4.8; added `GEMINI_FM_PROMO_*` (20% through 2026-06-30); documented AI Extract/Classify gap. Details in [docs/PRICING_FITMENT.md](docs/PRICING_FITMENT.md) |
 
 ---
 
 ## How to Refresh
 
 1. **Quick refresh:** Query `system.billing.list_prices` in your workspace for current per-SKU rates.
-2. **Full refresh:** Re-fetch each page in the Primary Sources list (1–10), prioritizing 1, 2, 3, 11. Cross-reference Azure Learn (Source 1, dated header) against the databricks.com pricing pages — Azure Learn lags slightly but is the most reliable for static extraction.
-3. **Model availability:** Check `docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models` for additions/retirements. Retirement dates here precede pricing-page removal by weeks.
-4. **Region drift:** Re-fetch the three supported-regions pages (Source 17) when adding workspace regions.
+2. **Full refresh:** Follow the step-by-step checklist in **[docs/PRICING_FITMENT.md](docs/PRICING_FITMENT.md)** (canonical URLs + diff tables). Re-fetch Primary Sources 1–5 first; then 6–12 as needed.
+3. **Sanity script:** `python scripts/pricing_fitment_check.py` — model catalog counts and promo windows.
+4. **Model availability:** Check `docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models` for additions/retirements. Retirement dates here precede pricing-page removal by weeks.
+5. **Region drift:** Re-fetch the three supported-regions pages (Source 17) when adding workspace regions.

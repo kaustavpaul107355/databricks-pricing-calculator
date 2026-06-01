@@ -7,5 +7,8 @@ venv/
 dist/
 build/
 .DS_Store
+.pytest_cache/
+# Databricks CLI workspace sync metadata (local paths, hosts)
+.databricks/
 # Workspace-only files (not for git)
 app_keepalive.py

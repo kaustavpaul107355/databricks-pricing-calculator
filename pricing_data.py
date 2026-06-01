@@ -269,6 +269,11 @@ PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION = {
         "global": {"input": 71.429, "output": 357.143, "cache_write": 89.286, "cache_read": 7.143, "batch": 178.571},
         "in_geo": {"input": 78.571, "output": 392.857, "cache_write": 98.214, "cache_read": 7.857, "batch": 196.429},
     },
+    # Opus 4.8: same list rates as 4.5–4.7; batch listed as coming soon on pricing page (2026-05-30)
+    "Claude Opus 4.8": {
+        "global": {"input": 71.429, "output": 357.143, "cache_write": 89.286, "cache_read": 7.143, "batch": None},
+        "in_geo": {"input": 78.571, "output": 392.857, "cache_write": 98.214, "cache_read": 7.857, "batch": None},
+    },
     "Claude Opus 4/4.1": {
         "global": {"input": 214.286, "output": 1071.429, "cache_write": 267.857, "cache_read": 21.429, "batch": 514.286},
         "in_geo": {"input": 214.286, "output": 1071.429, "cache_write": 267.857, "cache_read": 21.429, "batch": 514.286},
@@ -287,25 +292,35 @@ PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION = {
         "in_geo": {"input": 15.715, "output": 78.572, "cache_write": 19.643, "cache_read": 1.572, "batch": 125.714},
     },
     # --- Google ---
+    # List rates below; 20% promotional discount on Gemini through 2026-06-30 (see GEMINI_FM_PROMO_*)
+    "Gemini 3.5 Flash": {
+        "global": {"input": 26.786, "output": 160.714, "cache_write": 26.786, "cache_read": 2.679, "batch": 196.429},
+        "in_geo": {"input": 29.464, "output": 176.786, "cache_write": 29.464, "cache_read": 2.946, "batch": 216.071},
+    },
     "Gemini 3.1 Pro": {
-        "global": {"input": 35.714, "output": 214.286, "cache_write": 35.714, "cache_read": 3.571, "batch": 230.357},
+        "global": {"input": 35.714, "output": 214.286, "cache_write": 35.714, "cache_read": 3.571, "batch": 230.429},
         "in_geo": {"input": 39.285, "output": 235.715, "cache_write": 39.285, "cache_read": 3.929, "batch": 253.393},
-        "long_context": {"input": 71.429, "output": 321.429, "cache_write": 71.429, "cache_read": 7.143, "batch": 230.357},
+        "long_context": {"input": 71.429, "output": 321.429, "cache_write": 71.429, "cache_read": 7.143, "batch": 230.429},
     },
     "Gemini 3.1 Flash Lite": {
-        "global": {"input": 3.571, "output": 21.429, "cache_write": 3.571, "cache_read": 0.357, "batch": 71.429},
-        "long_context": {"input": 3.571, "output": 21.429, "cache_write": 3.571, "cache_read": 0.357, "batch": 71.429},
+        "global": {"input": 4.464, "output": 26.786, "cache_write": 4.464, "cache_read": 0.446, "batch": 89.286},
+        "in_geo": {"input": 4.911, "output": 29.464, "cache_write": 4.911, "cache_read": 0.491, "batch": 98.214},
     },
     "Gemini 3.0 Flash": {
         "global": {"input": 8.929, "output": 53.571, "cache_write": 8.929, "cache_read": 0.893, "batch": 125.0},
         "long_context": {"input": 8.929, "output": 53.571, "cache_write": 8.929, "cache_read": 0.893, "batch": 125.0},
     },
     "Gemini 2.5 Pro": {
-        "global": {"input": 17.857, "output": 142.857, "cache_write": None, "cache_read": None, "batch": 164.286},
-        "long_context": {"input": 35.714, "output": 214.286, "cache_write": None, "cache_read": None, "batch": 164.286},
+        "global": {"input": 22.321, "output": 178.571, "cache_write": 22.321, "cache_read": 2.232, "batch": 203.571},
+        "long_context": {"input": 44.643, "output": 267.857, "cache_write": 44.643, "cache_read": 4.464, "batch": 203.571},
     },
     "Gemini 2.5 Flash": {
-        "global": {"input": 4.286, "output": 35.714, "cache_write": None, "cache_read": None, "batch": 107.143},
+        "global": {"input": 5.357, "output": 44.643, "cache_write": 5.357, "cache_read": 0.536, "batch": 133.929},
+        "in_geo": {"input": 5.357, "output": 44.643, "cache_write": 5.357, "cache_read": 0.536, "batch": 133.929},
+    },
+    "Gemini 2.5 Flash Lite": {
+        "global": {"input": 1.786, "output": 7.143, "cache_write": 1.786, "cache_read": 0.179, "batch": None},
+        "in_geo": {"input": 1.786, "output": 7.143, "cache_write": 1.786, "cache_read": 0.179, "batch": None},
     },
 }
 
@@ -352,6 +367,10 @@ AI_PARSE_DBU_PER_1K_PAGES = {
 AI_PARSE_PROMO_DISCOUNT = 0.50
 AI_PARSE_PROMO_EXPIRY = "2026-06-30"
 
+# Gemini proprietary FM: 20% off list through 2026-06-30 (proprietary-foundation-model-serving page)
+GEMINI_FM_PROMO_DISCOUNT = 0.20
+GEMINI_FM_PROMO_EXPIRY = "2026-06-30"
+
 # Solution-oriented labels for AI Parse: "What are you parsing?" -> (display label, key in AI_PARSE_DBU_PER_1K_PAGES)
 AI_PARSE_DOCUMENT_TYPE_LABELS = [
     ("Receipts, W2s (simple text)", "Low (simple text, e.g. receipts, W2s)"),
@@ -359,6 +378,67 @@ AI_PARSE_DOCUMENT_TYPE_LABELS = [
     ("Company 10-Ks (tables + text + images)", "Medium (text + tables + images, e.g. 10-Ks)"),
     ("Engineering diagrams (complex)", "High (complex diagrams + captions)"),
 ]
+
+# --- AI Extract / AI Classify (same AI Functions pricing page as AI Parse) ---
+# Source: https://www.databricks.com/product/pricing/ai-parse — Estimated SRTI DBUs per 1K inputs/documents.
+# Midpoints of published ranges. Requires parsed documents via ai_parse_document upstream.
+AI_EXTRACT_DBU_PER_1K_INPUTS = {
+    "Invoices (~1 page)": 45.0,  # page range 30–60
+    "Financial reports (12-15 pages)": 67.5,  # page range 45–90
+}
+
+AI_CLASSIFY_DBU_PER_1K_DOCUMENTS = {
+    "Short text (e.g. news brief)": 4.5,  # range 3–6
+    "Rental contracts (7-10 pages)": 50.0,  # range 40–60
+}
+
+AI_EXTRACT_WORKLOAD_LABELS = [
+    ("Invoices / purchase orders (~1 page)", "Invoices (~1 page)"),
+    ("Annual financial reports (12-15 pages)", "Financial reports (12-15 pages)"),
+]
+
+AI_CLASSIFY_WORKLOAD_LABELS = [
+    ("Short text (news brief)", "Short text (e.g. news brief)"),
+    ("Rental contracts (7-10 pages)", "Rental contracts (7-10 pages)"),
+]
+
+# Shared 50% promotion for AI Parse, Extract, and Classify (ai-functions pricing page)
+AI_FUNCTIONS_PROMO_DISCOUNT = AI_PARSE_PROMO_DISCOUNT
+AI_FUNCTIONS_PROMO_EXPIRY = AI_PARSE_PROMO_EXPIRY
+
+# Model retirement notices (supported-models doc); shown in UI dropdowns and result areas
+MODEL_RETIREMENT_NOTICES: dict[str, dict[str, str]] = {
+    "GPT 5.2/5.3 Codex": {
+        "retire_date": "2026-07-16",
+        "replacement": "GPT 5.2 or a current Codex model",
+    },
+    "GPT 5.1 Codex Max": {
+        "retire_date": "2026-07-16",
+        "replacement": "GPT 5.1 Codex Mini or GPT 5.2",
+    },
+    "GPT 5.1 Codex Mini": {
+        "retire_date": "2026-07-16",
+        "replacement": "GPT 5.2 or GPT 5.1 Codex Max",
+    },
+    "Llama 3.1 405B (deprecated)": {
+        "retire_date": "2026-05-15",
+        "replacement": "Llama 3.3 70B or Llama 4 Maverick",
+        "note": "Pay-per-token retired Feb 2026; provisioned throughput no longer available",
+    },
+}
+
+
+def get_model_retirement_notice(model: str) -> dict[str, str] | None:
+    """Return retirement metadata for a catalog model name, if any."""
+    return MODEL_RETIREMENT_NOTICES.get(model)
+
+
+def format_model_option_label(model: str) -> str:
+    """Dropdown label with optional retirement suffix."""
+    notice = get_model_retirement_notice(model)
+    if not notice:
+        return model
+    return f"{model} (retiring {notice['retire_date']})"
 
 
 # --- Model Training ---
@@ -832,11 +912,14 @@ MODEL_QUALITY_TIER = {
     "Claude Sonnet 4.5/4.6": "high",
     "Claude Opus 4/4.1": "frontier",
     "Claude Opus 4.5/4.6/4.7": "frontier",
+    "Claude Opus 4.8": "frontier",
     "Gemini 2.5 Flash": "mid",
+    "Gemini 2.5 Flash Lite": "entry",
     "Gemini 2.5 Pro": "high",
     "Gemini 3.0 Flash": "mid",
     "Gemini 3.1 Flash Lite": "entry",
     "Gemini 3.1 Pro": "frontier",
+    "Gemini 3.5 Flash": "mid",
 }
 
 

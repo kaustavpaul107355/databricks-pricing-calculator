@@ -12,6 +12,8 @@ from calculator import (
     estimate_model_serving_cpu,
     estimate_storage,
     estimate_ai_parse,
+    estimate_ai_extract,
+    estimate_ai_classify,
     estimate_foundation_model_tokens,
 )
 from scenarios import (
@@ -36,6 +38,10 @@ from pricing_data import (
     EXAMPLE_PRICE_PER_DBU_BY_WORKLOAD,
     MODEL_SERVING_GPU_DBU_PER_HOUR,
     AI_PARSE_DBU_PER_1K_PAGES,
+    AI_EXTRACT_DBU_PER_1K_INPUTS,
+    AI_CLASSIFY_DBU_PER_1K_DOCUMENTS,
+    AI_EXTRACT_WORKLOAD_LABELS,
+    AI_CLASSIFY_WORKLOAD_LABELS,
     FOUNDATION_MODEL_DBU_PER_MILLION,
     get_all_models_with_pt,
 )
@@ -104,6 +110,18 @@ def cmd_ai_parse(args):
     return r.cost_usd
 
 
+def cmd_ai_extract(args):
+    r = estimate_ai_extract(args.inputs_1k, args.workload, cloud=args.cloud, region=args.region)
+    _print_result(r)
+    return r.cost_usd
+
+
+def cmd_ai_classify(args):
+    r = estimate_ai_classify(args.documents_1k, args.workload, cloud=args.cloud, region=args.region)
+    _print_result(r)
+    return r.cost_usd
+
+
 def cmd_foundation_model(args):
     r = estimate_foundation_model_tokens(
         args.model,
@@ -162,6 +180,11 @@ def cmd_scenario(args):
         result = estimate_batch_pipeline_scenario(
             args.docs, 5, "Medium (text + tables + images, e.g. 10-Ks)",
             args.frequency, args.output_model or "Llama 3.3 70B",
+            include_extract=args.extract,
+            extract_workload=args.extract_workload,
+            include_classify=args.classify,
+            classify_workload=args.classify_workload,
+            apply_ai_functions_promo=not args.no_ai_promo,
             cloud=args.cloud, region=args.region,
         )
     elif args.scenario_type == "fine-tune":
@@ -230,6 +253,14 @@ def cmd_list(args):
         print("AI Parse complexity (DBU per 1k pages):")
         for k, v in AI_PARSE_DBU_PER_1K_PAGES.items():
             print(f"  {k}: {v}")
+    elif args.what == "ai-extract-workloads":
+        print("AI Extract workloads (DBU per 1k inputs):")
+        for k, v in AI_EXTRACT_DBU_PER_1K_INPUTS.items():
+            print(f"  {k}: {v}")
+    elif args.what == "ai-classify-workloads":
+        print("AI Classify workloads (DBU per 1k documents):")
+        for k, v in AI_CLASSIFY_DBU_PER_1K_DOCUMENTS.items():
+            print(f"  {k}: {v}")
     elif args.what == "foundation-models":
         print("Foundation Model Serving models (pay-per-token / PT):")
         for m, r in FOUNDATION_MODEL_DBU_PER_MILLION.items():
@@ -242,7 +273,7 @@ def cmd_list(args):
                 parts.append(f"PT {r['provisioned_per_hour']} DBU/hr")
             print(f"  {m}: {', '.join(parts)}")
     else:
-        print("Usage: list sql-sizes | vector-tiers | workloads | training-models | clouds | regions | skus | billing-products | ai-parse-complexity | foundation-models")
+        print("Usage: list sql-sizes | vector-tiers | workloads | training-models | clouds | regions | skus | billing-products | ai-parse-complexity | ai-extract-workloads | ai-classify-workloads | foundation-models")
     return 0
 
 
@@ -297,6 +328,16 @@ def main():
     p_ap.add_argument("complexity", choices=list(AI_PARSE_DBU_PER_1K_PAGES.keys()))
     p_ap.set_defaults(func=cmd_ai_parse)
 
+    p_ex = sub.add_parser("ai-extract", help="AI Extract estimate")
+    p_ex.add_argument("inputs_1k", type=float, help="Inputs in thousands")
+    p_ex.add_argument("workload", choices=list(AI_EXTRACT_DBU_PER_1K_INPUTS.keys()))
+    p_ex.set_defaults(func=cmd_ai_extract)
+
+    p_cl = sub.add_parser("ai-classify", help="AI Classify estimate")
+    p_cl.add_argument("documents_1k", type=float, help="Documents in thousands")
+    p_cl.add_argument("workload", choices=list(AI_CLASSIFY_DBU_PER_1K_DOCUMENTS.keys()))
+    p_cl.set_defaults(func=cmd_ai_classify)
+
     # foundation-model
     fm_models = list(FOUNDATION_MODEL_DBU_PER_MILLION.keys())
     p_fm = sub.add_parser("foundation-model", help="Foundation Model Serving (pay-per-token) estimate")
@@ -345,13 +386,32 @@ def main():
     p_sc.add_argument("--orch-model", default=None, help="Orchestrator model (agent)")
     p_sc.add_argument("--worker-model", default=None, help="Worker model (agent)")
     p_sc.add_argument("--output-model", default=None, help="Output model (batch)")
+    p_sc.add_argument("--extract", action="store_true", help="Include AI Extract after parse (batch)")
+    p_sc.add_argument(
+        "--extract-workload",
+        default=AI_EXTRACT_WORKLOAD_LABELS[0][1],
+        choices=list(AI_EXTRACT_DBU_PER_1K_INPUTS.keys()),
+        help="AI Extract workload (batch)",
+    )
+    p_sc.add_argument("--classify", action="store_true", help="Include AI Classify after parse (batch)")
+    p_sc.add_argument(
+        "--classify-workload",
+        default=AI_CLASSIFY_WORKLOAD_LABELS[0][1],
+        choices=list(AI_CLASSIFY_DBU_PER_1K_DOCUMENTS.keys()),
+        help="AI Classify workload (batch)",
+    )
+    p_sc.add_argument("--no-ai-promo", action="store_true", help="Disable 50%% AI Functions promo (batch)")
     p_sc.add_argument("--model", default=None, help="Base model (fine-tune)")
     p_sc.add_argument("--scale", default=None, help="Training scale (fine-tune)")
     p_sc.set_defaults(func=cmd_scenario)
 
     # list
     p_list = sub.add_parser("list", help="List options")
-    p_list.add_argument("what", choices=["sql-sizes", "vector-tiers", "workloads", "training-models", "clouds", "regions", "skus", "billing-products", "ai-parse-complexity", "foundation-models"])
+    p_list.add_argument("what", choices=[
+        "sql-sizes", "vector-tiers", "workloads", "training-models", "clouds", "regions",
+        "skus", "billing-products", "ai-parse-complexity", "ai-extract-workloads",
+        "ai-classify-workloads", "foundation-models",
+    ])
     p_list.add_argument("--cloud", default=None, help="For 'regions': AWS|GCP|Azure. For 'skus': AWS|GCP|Azure|MCT (omit to show summary)")
     p_list.set_defaults(func=cmd_list)
 

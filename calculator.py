@@ -28,6 +28,12 @@ from pricing_data import (
     AI_PARSE_DBU_PER_1K_PAGES,
     AI_PARSE_PROMO_DISCOUNT,
     AI_PARSE_PROMO_EXPIRY,
+    AI_EXTRACT_DBU_PER_1K_INPUTS,
+    AI_CLASSIFY_DBU_PER_1K_DOCUMENTS,
+    AI_FUNCTIONS_PROMO_DISCOUNT,
+    AI_FUNCTIONS_PROMO_EXPIRY,
+    GEMINI_FM_PROMO_DISCOUNT,
+    GEMINI_FM_PROMO_EXPIRY,
     AGENT_EVALUATION_DBU,
     SHUTTERSTOCK_DBU_PER_IMAGE,
     VECTOR_SEARCH_RERANKER_DBU_PER_1K_REQUESTS,
@@ -227,6 +233,16 @@ def estimate_model_serving_cpu(
     )
 
 
+def _apply_ai_functions_promo(cost: float, apply_promo: bool) -> tuple[float, bool]:
+    """Apply shared 50% AI Functions promo when active."""
+    if not apply_promo:
+        return cost, False
+    expiry = datetime.date.fromisoformat(AI_FUNCTIONS_PROMO_EXPIRY)
+    if datetime.date.today() <= expiry:
+        return cost * (1 - AI_FUNCTIONS_PROMO_DISCOUNT), True
+    return cost, False
+
+
 def estimate_ai_parse(
     pages_1k: float,
     complexity: str,
@@ -244,13 +260,7 @@ def estimate_ai_parse(
     dbu_total = dbu_per_1k * pages_1k
     price_per_dbu = get_price_per_dbu(cloud, region)
     cost = dbu_total * price_per_dbu
-
-    promo_applied = False
-    if apply_promo:
-        expiry = datetime.date.fromisoformat(AI_PARSE_PROMO_EXPIRY)
-        if datetime.date.today() <= expiry:
-            cost *= (1 - AI_PARSE_PROMO_DISCOUNT)
-            promo_applied = True
+    cost, promo_applied = _apply_ai_functions_promo(cost, apply_promo)
 
     label = _region_label(cloud, region)
     promo_note = " (50% promo applied)" if promo_applied else ""
@@ -260,6 +270,60 @@ def estimate_ai_parse(
         price_per_dbu=price_per_dbu,
         cost_usd=round(cost, 2),
         details=f"{dbu_per_1k} DBU/1k pages × {pages_1k} (1k pages) = {dbu_total:,.0f} DBUs{promo_note}",
+    )
+
+
+def estimate_ai_extract(
+    inputs_1k: float,
+    workload: str,
+    cloud: str = "AWS",
+    region: str = "us-east-1",
+    apply_promo: bool = True,
+) -> EstimateResult:
+    """Estimate AI Extract (schema-based extraction from parsed documents). Source: ai-parse pricing page."""
+    dbu_per_1k = AI_EXTRACT_DBU_PER_1K_INPUTS.get(workload)
+    if dbu_per_1k is None:
+        valid = ", ".join(AI_EXTRACT_DBU_PER_1K_INPUTS.keys())
+        raise ValueError(f"Unknown workload '{workload}'. Valid: {valid}")
+    dbu_total = dbu_per_1k * inputs_1k
+    price_per_dbu = get_price_per_dbu(cloud, region)
+    cost = dbu_total * price_per_dbu
+    cost, promo_applied = _apply_ai_functions_promo(cost, apply_promo)
+    label = _region_label(cloud, region)
+    promo_note = " (50% promo applied)" if promo_applied else ""
+    return EstimateResult(
+        description=f"AI Extract ({workload}){promo_note} — {cloud} · {label}",
+        dbu_total=dbu_total,
+        price_per_dbu=price_per_dbu,
+        cost_usd=round(cost, 2),
+        details=f"{dbu_per_1k} DBU/1k inputs × {inputs_1k} (1k inputs) = {dbu_total:,.0f} DBUs{promo_note}",
+    )
+
+
+def estimate_ai_classify(
+    documents_1k: float,
+    workload: str,
+    cloud: str = "AWS",
+    region: str = "us-east-1",
+    apply_promo: bool = True,
+) -> EstimateResult:
+    """Estimate AI Classify (schema-based classification). Source: ai-parse pricing page."""
+    dbu_per_1k = AI_CLASSIFY_DBU_PER_1K_DOCUMENTS.get(workload)
+    if dbu_per_1k is None:
+        valid = ", ".join(AI_CLASSIFY_DBU_PER_1K_DOCUMENTS.keys())
+        raise ValueError(f"Unknown workload '{workload}'. Valid: {valid}")
+    dbu_total = dbu_per_1k * documents_1k
+    price_per_dbu = get_price_per_dbu(cloud, region)
+    cost = dbu_total * price_per_dbu
+    cost, promo_applied = _apply_ai_functions_promo(cost, apply_promo)
+    label = _region_label(cloud, region)
+    promo_note = " (50% promo applied)" if promo_applied else ""
+    return EstimateResult(
+        description=f"AI Classify ({workload}){promo_note} — {cloud} · {label}",
+        dbu_total=dbu_total,
+        price_per_dbu=price_per_dbu,
+        cost_usd=round(cost, 2),
+        details=f"{dbu_per_1k} DBU/1k documents × {documents_1k} (1k docs) = {dbu_total:,.0f} DBUs{promo_note}",
     )
 
 
@@ -381,6 +445,7 @@ def estimate_proprietary_foundation_model(
     batch_hours: float = 0,
     cloud: str = "AWS",
     region: str = "us-east-1",
+    apply_gemini_promo: bool = True,
 ) -> EstimateResult:
     """Estimate cost for Proprietary Foundation Model Serving (pay-per-token).
     Supports tiers: global, in_geo, long_context.
@@ -417,13 +482,20 @@ def estimate_proprietary_foundation_model(
     if dbu_total <= 0:
         raise ValueError("Set at least one of input_millions, output_millions, cache_write/read_millions, or batch_hours > 0")
     cost = dbu_total * price_per_dbu
+    promo_applied = False
+    if apply_gemini_promo and model.startswith("Gemini"):
+        expiry = datetime.date.fromisoformat(GEMINI_FM_PROMO_EXPIRY)
+        if datetime.date.today() <= expiry:
+            cost *= (1 - GEMINI_FM_PROMO_DISCOUNT)
+            promo_applied = True
     label = _region_label(cloud, region)
+    promo_note = " (20% Gemini promo applied)" if promo_applied else ""
     return EstimateResult(
-        description=f"Proprietary Foundation Model ({model}, {tier_label}) — {cloud} · {label}",
+        description=f"Proprietary Foundation Model ({model}, {tier_label}){promo_note} — {cloud} · {label}",
         dbu_total=dbu_total,
         price_per_dbu=price_per_dbu,
         cost_usd=round(cost, 2),
-        details=" | ".join(parts) if parts else f"{dbu_total:,.0f} DBUs",
+        details=(" | ".join(parts) if parts else f"{dbu_total:,.0f} DBUs") + promo_note,
     )
 
 

@@ -1,68 +1,87 @@
-# Databricks Pricing Calculator — Status & Coverage
+# Status & Coverage — GenAI TCO Estimator (Dash)
+
+**Last updated:** 2026-05-30
 
 ## Where we are
 
-- **Single app:** One Streamlit app in `databricks-pricing-calculator` (no separate fullstack).
-- **Sources:** All rates and formulas are derived from the [Databricks pricing pages](https://www.databricks.com/product/pricing) and related docs (e.g. Azure Serverless DBU consumption). The app lists 29 source pages in the sidebar and runs **all calculations locally** (no “link-only” estimates).
-- **UI:** Main page has Cloud, Region, and optional SKU. Tabs: SQL Warehouse, Vector Search (incl. Reranker), Compute (DBU-hours), Model Training, Model Serving (CPU + GPU), Foundation Model, AI Parse, Storage, Agent Evaluation, ImageAI, and Scenarios (save/compare/export CSV). Sidebar: Pricing Pages (29 links) and SKU Reference.
+- **UI:** Dash app (`app.py`) with five tabs: GenAI Calculator (tile grid), PT vs PPT Break-Even, Model Comparison, Scenario Templates, Quick Estimate.
+- **Deploy:** `python app.py` on port `8000` (or `PORT` env); Databricks Apps via `app.yaml`.
+- **Logic:** `calculator.py` (atomic estimates), `scenarios.py` (composites), `pricing_data.py` (rates), `ui_helpers.py` (dropdown coercion).
+- **CLI:** Broader surface (SQL, storage, compute, etc.) — not all exposed in the Dash UI.
+- **Tests:** `pytest tests/` (52 tests as of 2026-05-30).
+- **Legacy:** `index.html` deprecated; do not use for current model catalog.
 
 ---
 
-## Coverage vs. web pricing pages
+## GenAI Calculator tab (per-service)
 
-### Fully covered (calculator tab + formula + data from page)
+| Service | UI tile | Calculator function | Confidence |
+|---------|---------|---------------------|------------|
+| Vector Search | Yes | `estimate_vector_search` | High |
+| Vector Search Reranker | Yes | `estimate_vector_search_reranker` | High |
+| Agent Bricks | Yes | `estimate_model_serving_cpu` / `_gpu` | High (same as Model Serving) |
+| Mosaic AI Gateway | Yes | `estimate_gateway_payload` | High (payload GB); guardrails = info only |
+| Model Serving | Yes | CPU / GPU serving | High |
+| Foundation Model (open) | Yes | `estimate_foundation_model_tokens` | High |
+| Proprietary FM | Yes | `estimate_proprietary_foundation_model` | High (tiers, cache, batch) |
+| AI Parse | Yes | `estimate_ai_parse` (+ 50% promo to 2026-06-30) | High |
+| AI Extract | Yes | `estimate_ai_extract` (+ shared 50% promo) | High |
+| AI Classify | Yes | `estimate_ai_classify` (+ shared 50% promo) | High |
+| Model retirement hints | Yes | `MODEL_RETIREMENT_NOTICES` + UI alerts | Medium (doc-driven dates) |
+| Agent Evaluation | Yes | `estimate_agent_evaluation` | High |
+| Model Training | Yes | `estimate_model_training` (one-time) | High |
 
-| Web pricing page | App tab | Confidence |
-|------------------|--------|------------|
-| [Databricks SQL](https://www.databricks.com/product/pricing/databricks-sql) | SQL Warehouse | **High** — Serverless DBU/hr by size; region $/DBU |
-| [Vector Search](https://www.databricks.com/product/pricing/vector-search) | Vector Search (+ Reranker in expander) | **High** — DBU/hr per unit for Standard & Storage Optimized; Reranker DBU/1k requests |
-| [Lakeflow Jobs](https://www.databricks.com/product/pricing/lakeflow-jobs), [Lakeflow Pipelines](https://www.databricks.com/product/pricing/lakeflow-spark-declarative-pipelines), [Lakeflow Connect](https://www.databricks.com/product/pricing/lakeflow-connect), [Lakebase](https://www.databricks.com/product/pricing/lakebase), [Data Science/ML](https://www.databricks.com/product/pricing/datascience-ml), [Databricks Apps](https://www.databricks.com/product/pricing/databricks-apps), [Clean Rooms](https://www.databricks.com/product/pricing/clean-rooms) | Compute (DBU-hours) | **High** — Workload dropdown with $/DBU; same formula (DBU × $/DBU). *Rates are example list prices; exact $/DBU from `system.billing.list_prices`* |
-| [Model Training](https://www.databricks.com/product/pricing/mosaic-foundation-model-training) | Model Training | **High** — DBU estimates per model/scale; $0.65/DBU (US East) from docs |
-| [Model Serving](https://www.databricks.com/product/pricing/model-serving) | Model Serving | **High** — CPU (1 DBU/hr per request) and GPU (DBU/hr by instance size) |
-| [Foundation Model Serving](https://www.databricks.com/product/pricing/foundation-model-serving), [Proprietary Foundation Model Serving](https://www.databricks.com/product/pricing/proprietary-foundation-model-serving) | Foundation Model | **High** — $/DBU per 1M input/output tokens and provisioned throughput; model list from pages |
-| [AI Parse Document](https://www.databricks.com/product/pricing/ai-parse) | AI Parse | **High** — DBU per 1k pages by complexity (low/medium/high) |
-| [Storage](https://www.databricks.com/product/pricing/storage) | Storage | **High** — DSU formula (GB + write/read ops + Vector Search units); $/DSU configurable |
-| [Agent Evaluation](https://www.databricks.com/product/pricing/agent-evaluation) | Agent Evaluation | **High** — LLM Judge (input/output tokens), Synthetic Data (per question); DBU rates from Azure doc |
-| [Shutterstock ImageAI](https://www.databricks.com/product/pricing/mosaic-imageai-serving) | ImageAI | **High** — DBU per image |
-| [Lakeflow Connect](https://www.databricks.com/product/pricing/lakeflow-connect) | Compute → workload **Lakeflow Connect** | **High** — Explicit workload in dropdown |
-| [Lakeflow Spark Declarative Pipelines](https://www.databricks.com/product/pricing/lakeflow-spark-declarative-pipelines) | Compute → workload **Lakeflow Pipelines** | **High** — Explicit workload in dropdown |
-| [Databricks Apps](https://www.databricks.com/product/pricing/databricks-apps) | Compute → workload **Databricks Apps** | **High** — Explicit workload; All-Purpose Serverless SKU maps here |
-| Data Quality Monitoring (LAKEHOUSE_MONITORING, DATA_QUALITY_MONITORING) | Compute → workload **Data Quality Monitoring** | **High** — Explicit workload in dropdown |
-
-Agent Bricks and Mosaic AI Gateway are **billed like Model Serving** (serverless inference); the app covers them via the same Model Serving (CPU/GPU) tab and workload/SKU mapping.
+**Ballpark total:** Sums monthly `dcc.Store` line items + one-time training.
 
 ---
 
-### Partially covered or reference-only
+## Other tabs
 
-| Web pricing page | Status |
-|------------------|--------|
-| [Data Transfer and Connectivity](https://www.databricks.com/product/pricing/data-transfer-connectivity) | **SKU list only** in sidebar (no calculator). Pricing is in PDF/contract; we don’t have a per-GB or per-endpoint formula in the app. |
-| [Platform Add-ons](https://www.databricks.com/product/pricing/platform-addons), [Managed Services](https://www.databricks.com/product/pricing/managed-services) | **Linked** in Pricing Pages; no in-app calculation (add-ons and managed services are plan-specific). |
-| [Delta Share from SAP BDC](https://www.databricks.com/product/pricing/delta-share-sap-business-data-cloud), [View Sharing](https://www.databricks.com/product/pricing/view-sharing), [Beta Products](https://www.databricks.com/product/pricing/beta-products) | **Linked** only; no calculator. |
+| Tab | Functions | Confidence |
+|-----|-----------|------------|
+| PT vs PPT Break-Even | `calculate_pt_vs_ppt_breakeven` | High (open models with PT rates only) |
+| Model Comparison | `compare_models` | High |
+| Scenario Templates | RAG, multi-agent, batch (+ optional Extract/Classify), fine-tune | Medium (heuristic architecture assumptions) |
+| Quick Estimate | Same scenarios via `presets.py` | Medium |
 
 ---
 
-### Not replicated by design
+## In `pricing_data.py` but not in Dash UI
 
-- **[Databricks Pricing Calculator (instance types)](https://www.databricks.com/product/pricing/product-pricing/instance-types)** — Official instance-type calculator; we link to it and use our own DBU-based estimates instead of reimplementing it.
-- **[GenAI Pricing Calculator](https://www.databricks.com/product/pricing/genai-pricing-calculator)**, **[SAP Databricks Sizing Calculator](https://www.databricks.com/product/pricing/sap-databricks-pricing-calculator)** — Specialized external tools; we link only.
+These remain available via **CLI** and data reference:
+
+- SQL Serverless, generic Compute (DBU-hours), Storage (DSU), Shutterstock ImageAI
+- Full SKU catalog (`list skus`)
+- Lakeflow / Lakebase workload $/DBU examples
+
+---
+
+## Not replicated (by design)
+
+| Area | Reason |
+|------|--------|
+| [Instance-type calculator](https://www.databricks.com/product/pricing/product-pricing/instance-types) | External tool; link in sidebar |
+| [Official GenAI calculator](https://www.databricks.com/product/pricing/genai-pricing-calculator) | External tool; link in sidebar |
+| Data Transfer & Connectivity | No public per-GB formula |
+| Platform add-ons, Managed Services | Plan-specific |
+| Contract / negotiated $/DBU | Use `system.billing.list_prices` |
 
 ---
 
 ## Confidence summary
 
-| Area | Confidence | Notes |
-|------|------------|--------|
-| **Formulas** | High | DBU × $/DBU, DSU × $/DSU, token rates, and DBU/hr rules match the documented model. |
-| **Rates in app** | Medium–High | SQL, Vector Search, Model Serving, Foundation Model, AI Parse, Storage, Training: sourced from pricing pages or Azure/docs. Compute **workload $/DBU** is “example list price”; real $/DBU from `system.billing.list_prices` or contract. |
-| **Region $/DBU** | Medium | Fixed per-region values (e.g. 0.07, 0.088); sufficient for estimates but may not match every plan or date. |
-| **Replicating “all” web calculation options** | High | We replicate **all** calculable product pricing pages: SQL, Vector Search (+ Reranker), Compute (with explicit workloads: Jobs, Lakeflow Connect, Lakeflow Pipelines, Databricks Apps, Data Quality Monitoring, DLT, Lakebase, Clean Rooms, etc.), Model Training, Model Serving, Foundation Model, AI Parse, Storage, Agent Evaluation, Shutterstock ImageAI. We do **not** replicate: Data Transfer/Connectivity (no public formula), Platform Add-ons, Managed Services, View Sharing, Delta Share SAP BDC, Beta, or the three external calculators. |
+| Area | Level | Notes |
+|------|-------|-------|
+| Formulas (DBU × $/DBU) | High | Matches public documentation model |
+| Published DBU rates | Medium–High | See `PRICING_SOURCES.md`; last major refresh 2026-05-04 |
+| Region $/DBU | Medium | Illustrative list prices |
+| Scenario TCO | Medium | Heuristic token/chunk/payload assumptions documented in `docs/DESIGN.md` |
 
 ---
 
-## Bottom line
+## Related docs
 
-- The app **does** replicate **all calculable** product pricing pages: SQL, Vector Search (incl. Reranker), Compute (with explicit workloads including Lakeflow Connect, Lakeflow Pipelines, Databricks Apps, Data Quality Monitoring), Model Training, Model Serving, Foundation Model, AI Parse, Storage, Agent Evaluation, and Shutterstock ImageAI. Formulas and rates are sourced from the pricing pages or Azure/docs.
-- It **does not** replicate: Data Transfer/Connectivity (no public per-GB formula), Platform Add-ons, Managed Services, View Sharing, Delta Share SAP BDC, Beta, or the three external calculators. For those, the app provides links and SKU reference only.
-- **Audit:** See `CALCULATION_COVERAGE.md` for a page-by-page checklist so we don’t miss any calculation offering when adding or changing pricing pages.
+- [CALCULATION_COVERAGE.md](./CALCULATION_COVERAGE.md) — checklist when adding pricing pages
+- [PRICING_SOURCES.md](./PRICING_SOURCES.md) — source verification log
+- [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md) — product requirements
+- [docs/DEV_LOG.md](./docs/DEV_LOG.md) — build log

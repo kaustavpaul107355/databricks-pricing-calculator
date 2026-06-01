@@ -1,63 +1,59 @@
-# Calculation coverage checklist
+# Calculation coverage checklist — GenAI TCO Estimator
 
-Use this when adding or changing pricing pages to ensure **no calculable offering is missing**. Each row is a `PRICING_PAGES` entry; **calculator_tab** and **App location** must stay in sync.
+Use when adding or changing GenAI pricing. The **Dash app** implements the rows marked **UI + calc**; CLI may expose additional workloads.
 
-| # | Category | Page label | calculator_tab | App location |
-|---|----------|------------|----------------|--------------|
-| 1 | Overview | Databricks Pricing | None | Link only (main overview) |
-| 2 | Data Engineering | Lakeflow Jobs | compute | **Compute** tab → workload **Jobs Compute** (or Jobs Light / Photon) |
-| 3 | Data Engineering | Lakeflow Spark Declarative Pipelines | compute | **Compute** tab → workload **Lakeflow Pipelines** |
-| 4 | Data Engineering | Lakeflow Connect | compute | **Compute** tab → workload **Lakeflow Connect** |
-| 5 | Databricks SQL | Databricks SQL | sql | **SQL Warehouse** tab |
-| 6 | Operational Database | Lakebase | compute | **Compute** tab → workload **Database Serverless (Lakebase)** |
-| 7 | Interactive workloads | Compute for Data Science | compute | **Compute** tab → workload **All-Purpose Compute** (or Photon) |
-| 8 | Interactive workloads | Databricks Apps | compute | **Compute** tab → workload **Databricks Apps** |
-| 9 | Artificial Intelligence | Agent Bricks | gpu | **Model Serving** tab (CPU/GPU) |
-| 10 | Artificial Intelligence | AI Parse Document | ai_parse | **AI Parse** tab |
-| 11 | Artificial Intelligence | Mosaic AI Gateway | gpu | **Model Serving** tab (CPU/GPU) |
-| 12 | Artificial Intelligence | Model Serving | gpu | **Model Serving** tab (CPU + GPU) |
-| 13 | Artificial Intelligence | Foundation Model Serving | gpu | **Foundation Model** tab |
-| 14 | Artificial Intelligence | Proprietary Foundation Model Serving | gpu | **Foundation Model** tab |
-| 15 | Artificial Intelligence | Shutterstock ImageAI | imageai | **ImageAI** tab |
-| 16 | Artificial Intelligence | Vector Search | vector | **Vector Search** tab (+ **Reranker** in expander) |
-| 17 | Artificial Intelligence | Agent Evaluation | agent_eval | **Agent Evaluation** tab |
-| 18 | Artificial Intelligence | Model Training | training | **Model Training** tab |
-| 19 | Platform | Tiers and Add-ons | None | Link only (plan-specific) |
-| 20 | Platform | Managed Services | None | Link only (plan-specific) |
-| 21 | Platform | Data Transfer and Connectivity | None | SKU list in sidebar; no formula |
-| 22 | Platform | Storage | storage | **Storage** tab |
-| 23 | Platform | Delta Share from SAP BDC | None | Link only |
-| 24 | Collaboration | Clean Rooms | compute | **Compute** tab → workload **Clean Rooms Collaborator** |
-| 25 | Collaboration | View Sharing | None | Link only |
-| 26 | Beta Products | Beta Products | None | Link only |
-| 27 | Calculator | Databricks Pricing Calculator (instance types) | None | Link only (external calculator) |
-| 28 | Calculator | Generative AI Pricing Calculator | None | Link only (external) |
-| 29 | Calculator | SAP Databricks Sizing Calculator | None | Link only (external) |
+## GenAI pricing pages → app mapping
 
-## Compute workload dropdown (must include)
+| # | Pricing page | App location | Calculator | Notes |
+|---|--------------|--------------|------------|-------|
+| 1 | [Agent Bricks](https://www.databricks.com/product/pricing/agent-bricks) | GenAI tile **Agent Bricks** | Model Serving CPU/GPU | Billed as serverless inference |
+| 2 | [AI Functions](https://www.databricks.com/product/pricing/ai-parse) | GenAI tile **AI Parse** | `estimate_ai_parse` | Dropdown value = complexity **key** |
+| 2a | Same page | GenAI tile **AI Extract** | `estimate_ai_extract` | Workload key; inputs in thousands |
+| 2b | Same page | GenAI tile **AI Classify** | `estimate_ai_classify` | Workload key; documents in thousands |
+| 3 | [Mosaic AI Gateway](https://www.databricks.com/product/pricing/mosaic-ai-gateway) | GenAI tile **Mosaic AI Gateway** | `estimate_gateway_payload` | Guardrails: informational only |
+| 4 | [Model Serving](https://www.databricks.com/product/pricing/model-serving) | GenAI tile **Model Serving** | CPU / GPU serving | |
+| 5 | [Foundation Model Serving](https://www.databricks.com/product/pricing/foundation-model-serving) | GenAI tile **Foundation Model** | `estimate_foundation_model_tokens` | PPT + PT (+ scaling capacity in data) |
+| 6 | [Proprietary FM Serving](https://www.databricks.com/product/pricing/proprietary-foundation-model-serving) | GenAI tile **Proprietary Model** | `estimate_proprietary_foundation_model` | Tier `dbc.Select`; validate tier on calc |
+| 7 | [Vector Search](https://www.databricks.com/product/pricing/vector-search) | GenAI tiles **Vector Search** + **Reranker** | `estimate_vector_search`, reranker | |
+| 8 | [Agent Evaluation](https://www.databricks.com/product/pricing/agent-evaluation) | GenAI tile **Agent Evaluation** | `estimate_agent_evaluation` | |
+| 9 | [Model Training](https://www.databricks.com/product/pricing/mosaic-foundation-model-training) | GenAI tile **Model Training** | `estimate_model_training` | One-time in total |
+| 10 | [GenAI Pricing Calculator](https://www.databricks.com/product/pricing/genai-pricing-calculator) | Sidebar link | — | External reference |
 
-Every pricing page that bills as **DBU × $/DBU** and is not a dedicated tab should have an **explicit workload** in `EXAMPLE_PRICE_PER_DBU_BY_WORKLOAD` and in the Compute tab dropdown:
+## Scenario templates (composite)
 
-- Jobs Light Compute  
-- Jobs Compute  
-- **Lakeflow Connect**  
-- **Lakeflow Pipelines**  
-- Jobs Compute (Photon)  
-- All-Purpose Compute / All-Purpose Compute (Photon)  
-- **Databricks Apps**  
-- SQL Compute / SQL Pro Compute  
-- Serverless SQL  
-- DLT Core / DLT Pro / DLT Advanced  
-- **Data Quality Monitoring**  
-- Model Training, Vector Search, Serverless Real-Time Inference  
-- Database Serverless (Lakebase)  
-- Clean Rooms Collaborator  
-- Enhanced Security and Compliance  
+| Scenario | Inputs (Dash) | Estimator | Line items (typical) |
+|----------|---------------|-----------|----------------------|
+| RAG Application | docs, pages, chunks, Q/day, emb + LLM models, parse complexity | `estimate_rag_scenario` | Parse, embeddings, VS, LLM, gateway, eval, storage |
+| Multi-Agent System | requests/day, steps, tools, models, VS checkbox | `estimate_multi_agent_scenario` | Orchestrator + worker LLM, optional VS, gateway |
+| Batch AI Pipeline | docs, pages, frequency, model, optional Extract/Classify | `estimate_batch_pipeline_scenario` | Parse, Extract, Classify, batch inference, Jobs, storage |
+| Fine-Tuned Model | base model, scale, serving hrs, retrain cadence, eval | `estimate_fine_tune_scenario` | Amortized training, PT serving, eval |
 
-## When adding a new pricing page
+**Parse complexity in scenarios:** Must use keys from `AI_PARSE_DBU_PER_1K_PAGES` (same as GenAI tile values).
 
-1. Add the page to `PRICING_PAGES` in `pricing_data.py` with the correct `calculator_tab`.
-2. If it has a **calculable formula** (DBU, DSU, tokens, etc.):
-   - **Compute-style (DBU × $/DBU):** Add a workload to `EXAMPLE_PRICE_PER_DBU_BY_WORKLOAD` and to the workload_map in `_build_sku_to_product_workload` if there are SKUs.
-   - **Dedicated product:** Add an estimate function in `calculator.py`, add a tab (or expander) in `app.py`, and add the data constants in `pricing_data.py`.
-3. Update this checklist and `STATUS_AND_COVERAGE.md`.
+## When adding a new GenAI price dimension
+
+1. Add constants to `pricing_data.py` with source comment + row in `PRICING_SOURCES.md`.
+2. Add or extend `estimate_*` in `calculator.py`.
+3. Add GenAI tile + callback in `app.py` (use `ui_helpers` for dropdown patterns).
+4. Add `dcc.Store` + label in `GENAI_STORE_LABELS` if part of monthly total.
+5. Extend CLI if needed.
+6. Add pytest in `tests/`.
+7. Update this file and `STATUS_AND_COVERAGE.md`.
+8. Log session in `docs/DEV_LOG.md`.
+
+## UI dropdown rules (avoid common bugs)
+
+| Control | Value stored | Coercion |
+|---------|--------------|----------|
+| AI Parse complexity | `AI_PARSE_DBU_PER_1K_PAGES` **key** | `parse_complexity_options()` |
+| AI Extract workload | `AI_EXTRACT_DBU_PER_1K_INPUTS` **key** | `ai_extract_workload_options()` |
+| AI Classify workload | `AI_CLASSIFY_DBU_PER_1K_DOCUMENTS` **key** | `ai_classify_workload_options()` |
+| FM / proprietary model | catalog name | `model_options_with_retirement()`; `retirement_alert()` |
+| Proprietary tier | tier id (`global`, `in_geo`, …) | `resolve_proprietary_tier(model, tier)` on every calc |
+| Training scale | scale string | `resolve_training_scale(model, scale)` |
+| Cloud → Region | region id per cloud | Preserve region when still valid after cloud change |
+| Multi-agent VS | Checklist `yes` | `checklist_enabled(ma_vs)` not `bool(list)` |
+
+## CLI-only workloads (not in Dash)
+
+Still in `pricing_data.py` / `cli.py`: SQL warehouse, storage DSU, compute DBU-hours, ImageAI, SKU listing.

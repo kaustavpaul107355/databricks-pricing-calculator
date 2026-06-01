@@ -15,6 +15,8 @@ from calculator import (
     estimate_foundation_model_tokens,
     estimate_proprietary_foundation_model,
     estimate_ai_parse,
+    estimate_ai_extract,
+    estimate_ai_classify,
     estimate_agent_evaluation,
     estimate_model_training,
     estimate_model_serving_cpu,
@@ -28,6 +30,8 @@ from pricing_data import (
     PROPRIETARY_FOUNDATION_MODEL_DBU_PER_MILLION,
     VECTOR_SEARCH_DBU_PER_HOUR,
     AI_PARSE_DBU_PER_1K_PAGES,
+    AI_EXTRACT_DBU_PER_1K_INPUTS,
+    AI_CLASSIFY_DBU_PER_1K_DOCUMENTS,
     MODEL_TRAINING_DBU_ESTIMATES,
 )
 
@@ -370,20 +374,46 @@ def estimate_batch_pipeline_scenario(
     output_model: str,
     avg_input_tokens_per_doc: int = 2000,
     avg_output_tokens_per_doc: int = 1000,
+    include_extract: bool = False,
+    extract_workload: str | None = None,
+    include_classify: bool = False,
+    classify_workload: str | None = None,
+    apply_ai_functions_promo: bool = True,
     cloud: str = "AWS",
     region: str = "us-east-1",
 ) -> ScenarioResult:
     """Estimate total monthly cost for a batch AI processing pipeline."""
     items = []
+    total_docs = num_docs * frequency_per_month
 
     # 1. AI Parse
     total_pages_1k = (num_docs * pages_per_doc * frequency_per_month) / 1000
     if total_pages_1k > 0 and parse_complexity in AI_PARSE_DBU_PER_1K_PAGES:
-        r = estimate_ai_parse(total_pages_1k, parse_complexity, cloud=cloud, region=region)
+        r = estimate_ai_parse(
+            total_pages_1k, parse_complexity, cloud=cloud, region=region,
+            apply_promo=apply_ai_functions_promo,
+        )
         items.append(ScenarioLineItem("AI Parse (document processing)", r))
 
+    # 1b. AI Extract (one input per document after parse)
+    inputs_1k = total_docs / 1000
+    if include_extract and inputs_1k > 0 and extract_workload in AI_EXTRACT_DBU_PER_1K_INPUTS:
+        r = estimate_ai_extract(
+            inputs_1k, extract_workload, cloud=cloud, region=region,
+            apply_promo=apply_ai_functions_promo,
+        )
+        items.append(ScenarioLineItem(f"AI Extract ({extract_workload})", r))
+
+    # 1c. AI Classify (one document per classified record after parse)
+    documents_1k = total_docs / 1000
+    if include_classify and documents_1k > 0 and classify_workload in AI_CLASSIFY_DBU_PER_1K_DOCUMENTS:
+        r = estimate_ai_classify(
+            documents_1k, classify_workload, cloud=cloud, region=region,
+            apply_promo=apply_ai_functions_promo,
+        )
+        items.append(ScenarioLineItem(f"AI Classify ({classify_workload})", r))
+
     # 2. Batch inference
-    total_docs = num_docs * frequency_per_month
     input_m = total_docs * avg_input_tokens_per_doc / 1e6
     output_m = total_docs * avg_output_tokens_per_doc / 1e6
     r = _estimate_model_cost(output_model, input_m, output_m, cloud, region)
@@ -408,8 +438,15 @@ def estimate_batch_pipeline_scenario(
         line_items=items,
         total_monthly_usd=round(total_monthly, 2),
         assumptions={
-            "num_docs": num_docs, "pages_per_doc": pages_per_doc,
-            "frequency_per_month": frequency_per_month, "output_model": output_model,
+            "num_docs": num_docs,
+            "pages_per_doc": pages_per_doc,
+            "frequency_per_month": frequency_per_month,
+            "output_model": output_model,
+            "total_docs_per_month": total_docs,
+            "include_extract": include_extract,
+            "extract_workload": extract_workload,
+            "include_classify": include_classify,
+            "classify_workload": classify_workload,
         },
     )
 
